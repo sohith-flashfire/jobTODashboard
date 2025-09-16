@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" type="text/css" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <div id="login-container">
+      <div class="login-header">
+        <div class="brand-row">
+          <div class="brand-logo">🔥</div>
+          <div class="brand-title">flashfire</div>
+        </div>
+      </div>
+      <h2>Login to Continue</h2>
+      <form id="login-form">
+        <div class="input-group">
+          <label for="email">Email</label>
+          <input type="email" id="email" required>
+        </div>
+        <div class="input-group">
+          <label for="password">Password</label>
+          <div class="password-input-container">
+            <input type="password" id="password" required>
+            <button type="button" id="toggle-password" class="toggle-password-btn">👁️</button>
+          </div>
+        </div>
+        <button type="submit" class="login-btn">Login</button>
+      </form>
+      <div id="login-message"></div>
+    </div>
+
+    <div id="client-container" class="hidden">
+      <div class="client-header">
+        <div class="brand-row">
+          <div class="brand-logo">🔥</div>
+          <div class="brand-title">flashfire</div>
+        </div>
+        <button id="client-logout-btn" class="logout-btn">Logout</button>
+      </div>    
+      <div class="client-actions">
+        <p class="brand-subtitle">I'm your flashfire copilot! How can I help?</p>
+        <button id="client-save" class="client-action-btn">Save to Dashboard</button>
+        <a id="client-visit" href="https://frontend-dashboard-sohith.vercel.app/" target="_blank" class="client-action-btn">Visit Dashboard</a>
+      </div>
+    </div>
+
+    <div id="main-container" class="hidden">
+      <div class="header">
+        <div class="header-top">
+          <h2>Select Users</h2>
+          <div class="header-buttons">
+            <button id="uncheck-all-btn" class="uncheck-all-btn">Uncheck All</button>
+            <button id="logout-btn" class="logout-btn">Logout</button>
+          </div>
+        </div>
+        <div class="search-container">
+          <input type="text" id="search-input" placeholder="Search by name...">
+          <button id="add-jobs" class="add-jobs-btn">Add Jobs</button>
+        </div>
+      </div>
+      <div id="users-list" class="users-list"></div>
+      <button id="scroll-to-top" class="scroll-to-top-btn hidden">↑ Go to Top</button>
+      <button id="scroll-to-top-left" class="scroll-to-top-left-btn hidden">↑ Top</button>
+    </div>
+  </div>
+
+  <div id="job-description-modal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Enter Job Description</h3>
+        <button id="close-modal" class="close-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="input-group">
+          <label for="company-name">Company Name</label>
+          <input type="text" id="company-name" placeholder="Enter company name">
+        </div>
+        <div class="input-group">
+          <label for="job-title">Job Title</label>
+          <input type="text" id="job-title" placeholder="Enter job title">
+        </div>
+        <div class="input-group">
+          <label for="job-description">Job Description</label>
+          <textarea id="job-description" rows="10" placeholder="Copy and paste the job description here..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="cancel-job" class="cancel-btn">Cancel</button>
+        <button id="save-job" class="save-btn">Save Job</button>
+        <button id="extract-btn" class="extract-btn">Extract</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="exports.js"></script>
+  <script type="module" src="panel.js"></script>
+</body>
+</html>

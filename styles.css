@@ -1,0 +1,681 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, sans-serif;
+  background-color: #f5f5f5;
+  color: #333;
+  line-height: 1.6;
+}
+
+.container {
+  padding: 20px;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* Login Form */
+#login-container {
+  width: 90%;
+  max-width: 500px;
+  margin: auto;
+  padding: 40px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+#login-container h2 {
+  text-align: center;
+  margin-bottom: 20px;
+  color: #0a66c2;
+}
+
+.login-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.login-actions { display: flex; align-items: center; gap: 8px; }
+
+.login-compact {
+  width: auto;
+  padding: 10px 14px;
+  margin-top: 0;
+}
+
+.input-group {
+  margin-bottom: 20px;
+}
+
+.input-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 500;
+}
+
+.input-group input {
+  width: 100%;
+  padding: 12px 15px;
+  border: 2px solid #e1e5e9;
+  border-radius: 8px;
+  font-size: 16px;
+  transition: border-color 0.3s ease;
+  box-sizing: border-box;
+}
+
+.input-group input:focus {
+  outline: none;
+  border-color: #0a66c2;
+  box-shadow: 0 0 0 3px rgba(10, 102, 194, 0.1);
+}
+
+/* Password Input Container */
+.password-input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-input-container input {
+  padding-right: 50px;
+}
+
+.toggle-password-btn {
+  position: absolute;
+  right: 15px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  padding: 8px;
+  color: #666;
+  transition: color 0.2s;
+  z-index: 1;
+}
+
+.toggle-password-btn:hover {
+  color: #0a66c2;
+}
+
+.login-btn {
+  width: 100%;
+  padding: 15px;
+  background-color: #0a66c2;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-top: 10px;
+}
+
+.login-btn:hover {
+  background-color: #004182;
+}
+
+.message {
+  margin-top: 15px;
+  padding: 10px;
+  border-radius: 4px;
+  text-align: center;
+}
+
+.message.error {
+  background-color: #ffebee;
+  color: #c62828;
+}
+
+.message.success {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+}
+
+/* Main Container */
+.header {
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #eee;
+}
+
+.header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.header h2 {
+  color: #0a66c2;
+  margin: 0;
+}
+
+.header-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.extract-btn {
+  padding: 8px 16px;
+  background-color: #17a2b8;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+  flex: 1;
+}
+
+.extract-btn:hover {
+  background-color: #138496;
+}
+
+.uncheck-all-btn {
+  padding: 8px 12px;
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.uncheck-all-btn:hover {
+  background-color: #5a6268;
+}
+
+.logout-btn {
+  padding: 8px 12px;
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.logout-btn:hover {
+  background-color: #c82333;
+}
+
+.search-container {
+  display: flex;
+  gap: 10px;
+}
+
+#search-input {
+  flex: 1;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.add-jobs-btn {
+  padding: 10px 15px;
+  background-color: #0a66c2;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.add-jobs-btn:hover {
+  background-color: #004182;
+}
+
+/* Users List */
+.users-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.user-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 15px 20px 15px 20px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  transition: transform 0.2s, box-shadow 0.2s;
+  min-height: 60px;
+  cursor: pointer;
+  gap: 15px;
+}
+
+.user-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+/* Checkbox Styling */
+.checkbox-container {
+  display: flex;
+  align-items: center;
+  position: relative;
+  cursor: pointer;
+  font-size: 16px;
+  user-select: none;
+  height: 25px;
+  flex-shrink: 0;
+  order: 2;
+  margin-right: 10px;
+}
+
+.checkbox-container input {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+  height: 0;
+  width: 0;
+}
+
+.checkmark {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 25px;
+  width: 25px;
+  background-color: #eee;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.checkbox-container:hover input ~ .checkmark {
+  background-color: #ccc;
+}
+
+.checkbox-container input:checked ~ .checkmark {
+  background-color: #0a66c2;
+}
+
+.checkmark:after {
+  content: "";
+  position: absolute;
+  display: none;
+}
+
+.checkbox-container input:checked ~ .checkmark:after {
+  display: block;
+}
+
+.checkbox-container .checkmark:after {
+  left: 9px;
+  top: 5px;
+  width: 5px;
+  height: 10px;
+  border: solid white;
+  border-width: 0 3px 3px 0;
+  transform: rotate(45deg);
+}
+
+.user-info {
+  flex: 1;
+  min-width: 0;
+  order: 1;
+}
+
+.user-info h3 {
+  margin: 0;
+  color: #333;
+  font-size: 16px;
+  line-height: 1.4;
+  word-wrap: break-word;
+}
+
+.user-info p {
+  color: #666;
+  font-size: 14px;
+  display: none; /* Hide email text per requirement */
+}
+
+.no-users {
+  text-align: center;
+  padding: 20px;
+  color: #666;
+}
+
+/* Scroll to Top Button */
+.scroll-to-top-btn {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background-color: #0a66c2;
+  color: white;
+  border: none;
+  border-radius: 50px;
+  padding: 12px 20px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(10, 102, 194, 0.3);
+  transition: all 0.3s ease;
+  z-index: 1000;
+}
+
+.scroll-to-top-btn:hover {
+  background-color: #004182;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(10, 102, 194, 0.4);
+}
+
+.scroll-to-top-btn:active {
+  transform: translateY(0);
+}
+
+/* Left Side Scroll to Top Button */
+.scroll-to-top-left-btn {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  background-color: #0a66c2;
+  color: white;
+  border: none;
+  border-radius: 50px;
+  padding: 12px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(10, 102, 194, 0.3);
+  transition: all 0.3s ease;
+  z-index: 1000;
+  animation: slideInLeft 0.3s ease-out;
+}
+
+.scroll-to-top-left-btn:hover {
+  background-color: #004182;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(10, 102, 194, 0.4);
+}
+
+.scroll-to-top-left-btn:active {
+  transform: translateY(0);
+}
+
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+  .container {
+    padding: 15px;
+  }
+  
+  /* Keep checkbox beside username; do not stack vertically */
+  .user-card {
+    flex-direction: row;
+    align-items: center;
+  }
+  
+.checkbox-container {
+  margin-bottom: 0;
+}
+}
+
+/* Job Description Modal */
+.modal {
+position: fixed;
+top: 0;
+left: 0;
+width: 100%;
+height: 100%;
+background-color: rgba(0, 0, 0, 0.5);
+z-index: 10000;
+display: flex;
+align-items: center;
+justify-content: center;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 8px;
+  width: 95%;
+  max-width: 500px;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+display: flex;
+justify-content: space-between;
+align-items: center;
+padding: 20px;
+border-bottom: 1px solid #eee;
+}
+
+.modal-header h3 {
+margin: 0;
+color: #0a66c2;
+}
+
+.modal-header-buttons {
+display: flex;
+gap: 8px;
+align-items: center;
+}
+
+.close-modal {
+background: none;
+border: none;
+font-size: 24px;
+cursor: pointer;
+color: #666;
+padding: 0;
+width: 30px;
+height: 30px;
+display: flex;
+align-items: center;
+justify-content: center;
+}
+
+.close-modal:hover {
+color: #333;
+}
+
+.modal-body {
+padding: 20px;
+}
+
+.modal-body .input-group {
+margin-bottom: 20px;
+}
+
+.modal-body .input-group label {
+display: block;
+margin-bottom: 8px;
+font-weight: 500;
+color: #333;
+}
+
+.modal-body .input-group input,
+.modal-body .input-group textarea {
+width: 100%;
+padding: 12px;
+border: 1px solid #ddd;
+border-radius: 4px;
+font-size: 14px;
+font-family: inherit;
+box-sizing: border-box;
+}
+
+.modal-body .input-group textarea {
+resize: vertical;
+min-height: 120px;
+}
+
+.modal-footer {
+display: flex;
+justify-content: space-between;
+gap: 10px;
+padding: 20px;
+border-top: 1px solid #eee;
+flex-wrap: wrap;
+}
+
+.cancel-btn {
+padding: 8px 16px;
+background-color: #6c757d;
+color: white;
+border: none;
+border-radius: 4px;
+cursor: pointer;
+font-size: 14px;
+transition: background-color 0.2s;
+flex: 1;
+}
+
+.cancel-btn:hover {
+background-color: #5a6268;
+}
+
+.save-btn {
+padding: 8px 16px;
+background-color: #0a66c2;
+color: white;
+border: none;
+border-radius: 4px;
+cursor: pointer;
+font-size: 14px;
+transition: background-color 0.2s;
+flex: 1;
+}
+
+.save-btn:hover {
+background-color: #004182;
+}
+
+
+/* === Client simplified UI (UPDATED STYLES) === */
+.client-header { 
+display: flex;
+align-items: center; 
+justify-content: space-between;
+padding: 16px 20px; 
+border-bottom: 1px solid #e5e7eb; 
+background: white; 
+border-radius: 8px 8px 0 0;
+}
+
+.brand-row { 
+display: flex; 
+align-items: center; 
+gap: 12px;
+}
+
+.brand-logo { 
+font-size: 28px;
+}
+
+.brand-title { 
+font-weight: 600;
+font-size: 18px; 
+color: #111827;
+}
+
+.client-header .logout-btn {
+padding: 6px 14px;
+background-color: #fee2e2;
+color: #b91c1c;
+border: 1px solid #fca5a5;
+border-radius: 6px;
+font-weight: 500;
+transition: all 0.2s ease-in-out;
+}
+
+.client-header .logout-btn:hover {
+background-color: #f87171;
+color: #991b1b;
+border-color: #ef4444;
+}
+
+.client-actions { 
+display: flex;
+flex-direction: column;
+gap: 12px;
+padding: 24px 20px;
+background: #f9fafb;
+border-radius: 0 0 8px 8px;
+}
+
+.client-actions .brand-subtitle { 
+color: #6b7280; 
+font-size: 14px;
+text-align: center;
+margin: 0 0 12px 0; /* Adds space below the text */
+}
+
+.client-action-btn {
+display: flex;
+align-items: center;
+justify-content: center;
+width: 100%;
+padding: 12px;
+border-radius: 8px;
+font-size: 15px;
+font-weight: 600;
+text-decoration: none;
+cursor: pointer;
+transition: transform 0.2s ease, background-color 0.2s ease;
+border: none;
+box-sizing: border-box;
+}
+
+.client-action-btn:hover {
+transform: translateY(-2px);
+}
+
+#client-save.client-action-btn {
+background-color: #0a66c2;
+color: white;
+}
+
+#client-save.client-action-btn:hover {
+background-color: #004182;
+}
+
+#client-visit.client-action-btn {
+background-color: white;
+color: #374151;
+border: 1px solid #d1d5db;
+}
+
+#client-visit.client-action-btn:hover {
+background-color: #f3f4f6;
+border-color: #9ca3af;
+}
+
+.visit-link {
+/* This old style is no longer used for the client view */
+display: none;
+}
