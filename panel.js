@@ -21,6 +21,7 @@ document.addEventListener('DOMContentLoaded', function () {
   const clientLogoutBtn = document.getElementById('client-logout-btn');
   const clientSubtitleEl = document.querySelector('.brand-subtitle');
   const rolesListEl = document.getElementById('client-preferred-roles');
+  const locationsListEl = document.getElementById('client-preferred-locations');
 
   // Modal elements
   const jobModal = document.getElementById('job-description-modal');
@@ -55,6 +56,14 @@ document.addEventListener('DOMContentLoaded', function () {
     try {
       localStorage.setItem('extension_client_roles', JSON.stringify({
         roles: Array.isArray(roles) ? roles : [],
+        timestamp: Date.now()
+      }));
+    } catch (e) { }
+  }
+  function saveClientPreferredLocations(locations) {
+    try {
+      localStorage.setItem('extension_client_locations', JSON.stringify({
+        locations: Array.isArray(locations) ? locations : [],
         timestamp: Date.now()
       }));
     } catch (e) { }
@@ -115,6 +124,18 @@ document.addEventListener('DOMContentLoaded', function () {
     } catch (e) { }
     return [];
   }
+  function loadClientPreferredLocations() {
+    try {
+      const data = localStorage.getItem('extension_client_locations');
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (Date.now() - parsed.timestamp < 24 * 60 * 60 * 1000) {
+          return Array.isArray(parsed.locations) ? parsed.locations : [];
+        }
+      }
+    } catch (e) { }
+    return [];
+  }
 
   function loadClientAuth() {
     try {
@@ -148,17 +169,52 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   }
 
+  function normalizeList(items) {
+    const rawItems = Array.isArray(items) ? items : [items];
+    const parts = [];
+    for (const item of rawItems) {
+      if (Array.isArray(item)) {
+        item.forEach(sub => parts.push(sub));
+      } else if (typeof item === 'string') {
+        item.split(/[\n,]+/).forEach(p => parts.push(p));
+      } else if (item != null) {
+        parts.push(String(item));
+      }
+    }
+    const cleaned = parts
+      .map(x => String(x || '').trim())
+      .filter(x => x.length > 0);
+    // de-duplicate while preserving order
+    const seen = new Set();
+    const unique = [];
+    for (const c of cleaned) {
+      if (!seen.has(c.toLowerCase())) {
+        seen.add(c.toLowerCase());
+        unique.push(c);
+      }
+    }
+    return unique;
+  }
   function renderPreferredRoles(roles) {
     if (!rolesListEl) return;
     rolesListEl.innerHTML = '';
-    const clean = (Array.isArray(roles) ? roles : [])
-      .map(r => String(r || '').trim())
-      .filter(r => r.length > 0);
+    const clean = normalizeList(roles);
     clean.forEach(role => {
       const chip = document.createElement('span');
       chip.className = 'role-chip';
       chip.textContent = role;
       rolesListEl.appendChild(chip);
+    });
+  }
+  function renderPreferredLocations(locations) {
+    if (!locationsListEl) return;
+    locationsListEl.innerHTML = '';
+    const clean = normalizeList(locations);
+    clean.forEach(loc => {
+      const chip = document.createElement('span');
+      chip.className = 'role-chip';
+      chip.textContent = loc;
+      locationsListEl.appendChild(chip);
     });
   }
 
@@ -193,6 +249,14 @@ document.addEventListener('DOMContentLoaded', function () {
         }
       }
       renderPreferredRoles(cachedRoles);
+      let cachedLocs = loadClientPreferredLocations();
+      if (!cachedLocs.length) {
+        const { profile } = loadClientAuth();
+        if (profile && Array.isArray(profile.preferredLocations)) {
+          cachedLocs = profile.preferredLocations;
+        }
+      }
+      renderPreferredLocations(cachedLocs);
     }
   }
 
@@ -301,17 +365,23 @@ document.addEventListener('DOMContentLoaded', function () {
         const userProfile = data && data.userProfile ? data.userProfile : null;
         loggedInEmail = userDetails.email || email;
         loggedInName = userDetails.name || '';
-        let preferredRoles = Array.isArray(userDetails.preferredRoles) ? userDetails.preferredRoles : [];
+        let preferredRoles = Array.isArray(userDetails.preferredRoles) ? userDetails.preferredRoles : (typeof userDetails.preferredRoles === 'string' ? userDetails.preferredRoles : []);
         if (!preferredRoles.length && userProfile && Array.isArray(userProfile.preferredRoles)) {
           preferredRoles = userProfile.preferredRoles;
         }
+        let preferredLocations = Array.isArray(userDetails.preferredLocations) ? userDetails.preferredLocations : (typeof userDetails.preferredLocations === 'string' ? userDetails.preferredLocations : []);
+        if (!preferredLocations.length && userProfile && Array.isArray(userProfile.preferredLocations)) {
+          preferredLocations = userProfile.preferredLocations;
+        }
         saveClientLogin(loggedInEmail, loggedInName);
-        saveClientPreferredRoles(preferredRoles);
+        saveClientPreferredRoles(normalizeList(preferredRoles));
+        saveClientPreferredLocations(normalizeList(preferredLocations));
         saveClientAuth(token, userProfile);
         loginContainer.classList.add('hidden');
         if (clientContainer) clientContainer.classList.remove('hidden');
         setClientGreeting(loggedInName, loggedInEmail);
         renderPreferredRoles(preferredRoles);
+        renderPreferredLocations(preferredLocations);
       }
     } catch (error) {
       showMessage('Network error. Please try again.', 'error');
