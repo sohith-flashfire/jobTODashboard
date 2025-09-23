@@ -29,7 +29,7 @@ body {
   padding: 40px;
   background: white;
   border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
   position: absolute;
   top: 50%;
   left: 50%;
@@ -49,7 +49,11 @@ body {
   margin-bottom: 12px;
 }
 
-.login-actions { display: flex; align-items: center; gap: 8px; }
+.login-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 
 .login-compact {
   width: auto;
@@ -256,7 +260,7 @@ body {
   padding: 15px 20px 15px 20px;
   background: white;
   border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   transition: transform 0.2s, box-shadow 0.2s;
   min-height: 60px;
   cursor: pointer;
@@ -265,7 +269,7 @@ body {
 
 .user-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 /* Checkbox Styling */
@@ -303,11 +307,11 @@ body {
   justify-content: center;
 }
 
-.checkbox-container:hover input ~ .checkmark {
+.checkbox-container:hover input~.checkmark {
   background-color: #ccc;
 }
 
-.checkbox-container input:checked ~ .checkmark {
+.checkbox-container input:checked~.checkmark {
   background-color: #0a66c2;
 }
 
@@ -317,7 +321,7 @@ body {
   display: none;
 }
 
-.checkbox-container input:checked ~ .checkmark:after {
+.checkbox-container input:checked~.checkmark:after {
   display: block;
 }
 
@@ -348,7 +352,8 @@ body {
 .user-info p {
   color: #666;
   font-size: 14px;
-  display: none; /* Hide email text per requirement */
+  display: none;
+  /* Hide email text per requirement */
 }
 
 .no-users {
@@ -419,6 +424,7 @@ body {
     transform: translateX(-100px);
     opacity: 0;
   }
+
   to {
     transform: translateX(0);
     opacity: 1;
@@ -430,30 +436,30 @@ body {
   .container {
     padding: 15px;
   }
-  
+
   /* Keep checkbox beside username; do not stack vertically */
   .user-card {
     flex-direction: row;
     align-items: center;
   }
-  
-.checkbox-container {
-  margin-bottom: 0;
-}
+
+  .checkbox-container {
+    margin-bottom: 0;
+  }
 }
 
 /* Job Description Modal */
 .modal {
-position: fixed;
-top: 0;
-left: 0;
-width: 100%;
-height: 100%;
-background-color: rgba(0, 0, 0, 0.5);
-z-index: 10000;
-display: flex;
-align-items: center;
-justify-content: center;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .modal-content {
@@ -467,215 +473,248 @@ justify-content: center;
 }
 
 .modal-header {
-display: flex;
-justify-content: space-between;
-align-items: center;
-padding: 20px;
-border-bottom: 1px solid #eee;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #eee;
 }
 
 .modal-header h3 {
-margin: 0;
-color: #0a66c2;
+  margin: 0;
+  color: #0a66c2;
 }
 
 .modal-header-buttons {
-display: flex;
-gap: 8px;
-align-items: center;
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
 .close-modal {
-background: none;
-border: none;
-font-size: 24px;
-cursor: pointer;
-color: #666;
-padding: 0;
-width: 30px;
-height: 30px;
-display: flex;
-align-items: center;
-justify-content: center;
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #666;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .close-modal:hover {
-color: #333;
+  color: #333;
 }
 
 .modal-body {
-padding: 20px;
+  padding: 20px;
 }
 
 .modal-body .input-group {
-margin-bottom: 20px;
+  margin-bottom: 20px;
 }
 
 .modal-body .input-group label {
-display: block;
-margin-bottom: 8px;
-font-weight: 500;
-color: #333;
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #333;
 }
 
 .modal-body .input-group input,
 .modal-body .input-group textarea {
-width: 100%;
-padding: 12px;
-border: 1px solid #ddd;
-border-radius: 4px;
-font-size: 14px;
-font-family: inherit;
-box-sizing: border-box;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  font-family: inherit;
+  box-sizing: border-box;
 }
 
 .modal-body .input-group textarea {
-resize: vertical;
-min-height: 120px;
+  resize: vertical;
+  min-height: 120px;
 }
 
 .modal-footer {
-display: flex;
-justify-content: space-between;
-gap: 10px;
-padding: 20px;
-border-top: 1px solid #eee;
-flex-wrap: wrap;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 20px;
+  border-top: 1px solid #eee;
+  flex-wrap: wrap;
 }
 
 .cancel-btn {
-padding: 8px 16px;
-background-color: #6c757d;
-color: white;
-border: none;
-border-radius: 4px;
-cursor: pointer;
-font-size: 14px;
-transition: background-color 0.2s;
-flex: 1;
+  padding: 8px 16px;
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+  flex: 1;
 }
 
 .cancel-btn:hover {
-background-color: #5a6268;
+  background-color: #5a6268;
 }
 
 .save-btn {
-padding: 8px 16px;
-background-color: #0a66c2;
-color: white;
-border: none;
-border-radius: 4px;
-cursor: pointer;
-font-size: 14px;
-transition: background-color 0.2s;
-flex: 1;
+  padding: 8px 16px;
+  background-color: #0a66c2;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+  flex: 1;
 }
 
 .save-btn:hover {
-background-color: #004182;
+  background-color: #004182;
 }
 
 
 /* === Client simplified UI (UPDATED STYLES) === */
-.client-header { 
-display: flex;
-align-items: center; 
-justify-content: space-between;
-padding: 16px 20px; 
-border-bottom: 1px solid #e5e7eb; 
-background: white; 
-border-radius: 8px 8px 0 0;
+.client-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e5e7eb;
+  background: white;
+  border-radius: 8px 8px 0 0;
 }
 
-.brand-row { 
-display: flex; 
-align-items: center; 
-gap: 12px;
+.brand-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
-.brand-logo { 
-font-size: 28px;
+.brand-logo {
+  font-size: 28px;
 }
 
-.brand-title { 
-font-weight: 600;
-font-size: 18px; 
-color: #111827;
+.brand-title {
+  font-weight: 600;
+  font-size: 18px;
+  color: #111827;
 }
 
 .client-header .logout-btn {
-padding: 6px 14px;
-background-color: #fee2e2;
-color: #b91c1c;
-border: 1px solid #fca5a5;
-border-radius: 6px;
-font-weight: 500;
-transition: all 0.2s ease-in-out;
+  padding: 6px 14px;
+  background-color: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fca5a5;
+  border-radius: 6px;
+  font-weight: 500;
+  transition: all 0.2s ease-in-out;
 }
 
 .client-header .logout-btn:hover {
-background-color: #f87171;
-color: #991b1b;
-border-color: #ef4444;
+  background-color: #f87171;
+  color: #991b1b;
+  border-color: #ef4444;
 }
 
-.client-actions { 
-display: flex;
-flex-direction: column;
-gap: 12px;
-padding: 24px 20px;
-background: #f9fafb;
-border-radius: 0 0 8px 8px;
+.client-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px 20px;
+  background: #f9fafb;
+  border-radius: 0 0 8px 8px;
 }
 
-.client-actions .brand-subtitle { 
-color: #6b7280; 
-font-size: 14px;
-text-align: center;
-margin: 0 0 12px 0; /* Adds space below the text */
+/* Preferred Roles */
+.roles-section {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.roles-title {
+  font-size: 13px;
+  color: #6b7280;
+  margin-bottom: 8px;
+}
+
+.roles-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.role-chip {
+  background: #e8f0fe;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  border-radius: 9999px;
+  padding: 8px 14px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 16px;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.client-actions .brand-subtitle {
+  color: #6b7280;
+  font-size: 14px;
+  text-align: center;
+  margin: 0 0 12px 0;
+  /* Adds space below the text */
 }
 
 .client-action-btn {
-display: flex;
-align-items: center;
-justify-content: center;
-width: 100%;
-padding: 12px;
-border-radius: 8px;
-font-size: 15px;
-font-weight: 600;
-text-decoration: none;
-cursor: pointer;
-transition: transform 0.2s ease, background-color 0.2s ease;
-border: none;
-box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 0.2s ease, background-color 0.2s ease;
+  border: none;
+  box-sizing: border-box;
 }
 
 .client-action-btn:hover {
-transform: translateY(-2px);
+  transform: translateY(-2px);
 }
 
 #client-save.client-action-btn {
-background-color: #0a66c2;
-color: white;
+  background-color: #0a66c2;
+  color: white;
 }
 
 #client-save.client-action-btn:hover {
-background-color: #004182;
+  background-color: #004182;
 }
 
 #client-visit.client-action-btn {
-background-color: white;
-color: #374151;
-border: 1px solid #d1d5db;
+  background-color: white;
+  color: #374151;
+  border: 1px solid #d1d5db;
 }
 
 #client-visit.client-action-btn:hover {
-background-color: #f3f4f6;
-border-color: #9ca3af;
+  background-color: #f3f4f6;
+  border-color: #9ca3af;
 }
 
 .visit-link {
-/* This old style is no longer used for the client view */
-display: none;
+  /* This old style is no longer used for the client view */
+  display: none;
 }

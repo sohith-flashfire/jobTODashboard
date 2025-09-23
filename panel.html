@@ -1,9 +1,11 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <meta charset="utf-8">
   <link rel="stylesheet" type="text/css" href="styles.css">
 </head>
+
 <body>
   <div class="container">
     <div id="login-container">
@@ -38,11 +40,16 @@
           <div class="brand-title">flashfire</div>
         </div>
         <button id="client-logout-btn" class="logout-btn">Logout</button>
-      </div>    
+      </div>
       <div class="client-actions">
         <p class="brand-subtitle">I'm your flashfire copilot! How can I help?</p>
+        <div class="roles-section">
+          <div class="roles-title">Preferred Roles</div>
+          <div id="client-preferred-roles" class="roles-list"></div>
+        </div>
         <button id="client-save" class="client-action-btn">Save to Dashboard</button>
-        <a id="client-visit" href="https://frontend-dashboard-sohith.vercel.app/" target="_blank" class="client-action-btn">Visit Dashboard</a>
+        <a id="client-visit" href="https://frontend-dashboard-sohith.vercel.app/" target="_blank"
+          class="client-action-btn">Visit Dashboard</a>
       </div>
     </div>
 
@@ -97,4 +104,5 @@
   <script type="module" src="exports.js"></script>
   <script type="module" src="panel.js"></script>
 </body>
+
 </html>
