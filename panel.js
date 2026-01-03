@@ -198,10 +198,20 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!rolesListEl) return;
     rolesListEl.innerHTML = '';
     const clean = normalizeList(roles);
+    
+    if (clean.length === 0) {
+      const emptyMsg = document.createElement('div');
+      emptyMsg.className = 'roles-empty';
+      emptyMsg.textContent = 'No preferred roles set';
+      rolesListEl.appendChild(emptyMsg);
+      return;
+    }
+    
     clean.forEach(role => {
       const chip = document.createElement('span');
       chip.className = 'role-chip';
       chip.textContent = role;
+      chip.title = role; // Tooltip for full text
       rolesListEl.appendChild(chip);
     });
   }
@@ -209,10 +219,20 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!locationsListEl) return;
     locationsListEl.innerHTML = '';
     const clean = normalizeList(locations);
+    
+    if (clean.length === 0) {
+      const emptyMsg = document.createElement('div');
+      emptyMsg.className = 'roles-empty';
+      emptyMsg.textContent = 'No preferred locations set';
+      locationsListEl.appendChild(emptyMsg);
+      return;
+    }
+    
     clean.forEach(loc => {
       const chip = document.createElement('span');
       chip.className = 'role-chip';
       chip.textContent = loc;
+      chip.title = loc; // Tooltip for full text
       locationsListEl.appendChild(chip);
     });
   }
@@ -267,10 +287,10 @@ document.addEventListener('DOMContentLoaded', function () {
     togglePasswordBtn.addEventListener('click', function () {
       if (passwordInput.type === 'password') {
         passwordInput.type = 'text';
-        togglePasswordBtn.textContent = '🙈';
+        togglePasswordBtn.classList.add('show-password');
       } else {
         passwordInput.type = 'password';
-        togglePasswordBtn.textContent = '👁️';
+        togglePasswordBtn.classList.remove('show-password');
       }
     });
   }
@@ -329,6 +349,19 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
+    const loginBtn = loginForm.querySelector('.login-btn');
+
+    // Show loading state
+    const originalBtnContent = loginBtn.innerHTML;
+    loginBtn.disabled = true;
+    loginBtn.innerHTML = `
+      <svg class="login-spinner" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" stroke-opacity="0.25" fill="none"/>
+        <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
+      </svg>
+      <span>Logging in...</span>
+    `;
+    loginBtn.classList.add('loading');
 
     try {
       const isAdmin = /@flashfirehq$/i.test(email.trim());
@@ -347,6 +380,10 @@ document.addEventListener('DOMContentLoaded', function () {
       const data = await response.json();
 
       if (!response.ok) {
+        // Reset button state on error
+        loginBtn.disabled = false;
+        loginBtn.innerHTML = originalBtnContent;
+        loginBtn.classList.remove('loading');
         showMessage(data.message || 'Login failed', 'error');
         return;
       }
@@ -383,6 +420,10 @@ document.addEventListener('DOMContentLoaded', function () {
         renderPreferredLocations(preferredLocations);
       }
     } catch (error) {
+      // Reset button state on error
+      loginBtn.disabled = false;
+      loginBtn.innerHTML = originalBtnContent;
+      loginBtn.classList.remove('loading');
       showMessage('Network error. Please try again.', 'error');
       console.error('Login error:', error);
     }
@@ -740,7 +781,8 @@ document.addEventListener('DOMContentLoaded', function () {
           }
 
           function tryExtraction() {
-            chrome.tabs.sendMessage(tabId, { action: 'extractPageHtml' }, async function (response) {
+            // First, try to get structured job data (more reliable)
+            chrome.tabs.sendMessage(tabId, { action: 'getJobData' }, async function (structuredResponse) {
               if (chrome.runtime.lastError) {
                 chrome.scripting.executeScript({
                   target: { tabId: tabId },
@@ -755,48 +797,78 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
               }
 
-              if (response && response.ok) {
-                const { content, websiteUrl } = response.payload;
-
-                try {
-                  const extractedData = await extractJobDataWithOpenAI(content, websiteUrl);
-                  
-                  const jobData = {
-                    company: extractedData.company,
-                    position: extractedData.position,
-                    description: extractedData.description,
-                    url: websiteUrl,
-                    selectedEmails: selectedEmails
-                  };
-
-                  const backendResponse = await fetch(API_URLS.SAVE_TO_DASHBOARD, {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(jobData)
-                  });
-
-                  const backendData = await backendResponse.json();
-
-                  if (backendResponse.ok) {
-                    alert(`Job extracted and saved successfully! Saved for ${backendData.summary?.saved || 0} user(s).`);
-                  } else {
-                    alert('Failed to save job: ' + (backendData.message || 'Unknown error'));
-                  }
-                } catch (extractionError) {
-                  console.error('Extraction error:', extractionError);
-                  alert('Failed to extract job data: ' + extractionError.message);
-                } finally {
-                  extractBtn.disabled = false;
-                  extractBtn.textContent = 'Extract';
-                }
+              let extractedData = null;
+              
+              // If we got structured data and it's valid, use it
+              if (structuredResponse && structuredResponse.jobData && 
+                  structuredResponse.jobData.company !== 'Unknown Company' && 
+                  structuredResponse.jobData.position !== 'Unknown Position') {
+                extractedData = {
+                  company: structuredResponse.jobData.company,
+                  position: structuredResponse.jobData.position,
+                  description: structuredResponse.jobData.description || ''
+                };
+                console.log('Using structured job data:', extractedData);
+                processExtractedData(extractedData, selectedEmails);
               } else {
-                const errorMsg = response && response.error ? response.error : 'Unknown error';
-                alert('Failed to extract page content: ' + errorMsg);
-                extractBtn.disabled = false;
-                extractBtn.textContent = 'Extract';
+                // Fallback to AI extraction
+                console.log('Structured data not available, falling back to AI extraction');
+                chrome.tabs.sendMessage(tabId, { action: 'extractPageHtml' }, async function (response) {
+                  if (chrome.runtime.lastError) {
+                    alert('Failed to communicate with content script. Please refresh the page and try again.');
+                    extractBtn.disabled = false;
+                    extractBtn.textContent = 'Extract';
+                    return;
+                  }
+
+                  if (response && response.ok) {
+                    const { content, websiteUrl } = response.payload;
+
+                    try {
+                      extractedData = await extractJobDataWithOpenAI(content, websiteUrl);
+                      console.log('Using AI-extracted job data:', extractedData);
+                      processExtractedData(extractedData, selectedEmails);
+                    } catch (extractionError) {
+                      console.error('Extraction error:', extractionError);
+                      alert('Failed to extract job data: ' + extractionError.message);
+                      extractBtn.disabled = false;
+                      extractBtn.textContent = 'Extract';
+                    }
+                  } else {
+                    const errorMsg = response && response.error ? response.error : 'Unknown error';
+                    alert('Failed to extract page content: ' + errorMsg);
+                    extractBtn.disabled = false;
+                    extractBtn.textContent = 'Extract';
+                  }
+                });
               }
+            });
+          }
+
+          function processExtractedData(extractedData, selectedEmails) {
+            if (!extractedData) {
+              alert('Failed to extract job data. Please try again.');
+              extractBtn.disabled = false;
+              extractBtn.textContent = 'Extract';
+              return;
+            }
+
+            // Populate form fields with extracted data
+            companyNameInput.value = extractedData.company || '';
+            jobTitleInput.value = extractedData.position || '';
+            jobDescriptionInput.value = extractedData.description || '';
+            
+            // Show the modal so user can review and edit
+            showJobModal();
+            
+            // Reset button state
+            extractBtn.disabled = false;
+            extractBtn.textContent = 'Extract';
+            
+            console.log('Extracted data populated in form:', {
+              company: companyNameInput.value,
+              title: jobTitleInput.value,
+              descriptionLength: jobDescriptionInput.value.length
             });
           }
 
