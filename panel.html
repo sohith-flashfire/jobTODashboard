@@ -148,12 +148,27 @@
       <div class="modal-footer">
         <div class="modal-footer-left">
           <button id="extract-btn" class="extract-btn">
-            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <svg class="btn-icon extract-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               <polyline points="7 10 12 15 17 10" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               <line x1="12" y1="15" x2="12" y2="3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            <span>Extract</span>
+            <div class="extract-loader" style="display: none;">
+              <svg class="spinner" viewBox="0 0 24 24" fill="none">
+                <circle class="spinner-circle" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <span class="extract-text">Extract</span>
+            <span class="extract-tooltip">Our AI will extract the job for you, please wait 5-10 seconds</span>
+          </button>
+          <button id="save-job" class="save-btn">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <polyline points="17 21 17 13 7 13 7 21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <polyline points="7 3 7 8 15 8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span class="save-text">Save Job</span>
+            <span class="save-extracted-text">Save Extracted Job</span>
           </button>
         </div>
         <div class="modal-footer-right">
@@ -163,14 +178,6 @@
               <line x1="6" y1="6" x2="18" y2="18" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
             <span>Cancel</span>
-          </button>
-          <button id="save-job" class="save-btn">
-            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              <polyline points="17 21 17 13 7 13 7 21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              <polyline points="7 3 7 8 15 8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <span>Save Job</span>
           </button>
         </div>
       </div>

@@ -555,6 +555,11 @@ document.addEventListener('DOMContentLoaded', function () {
     companyNameInput.value = '';
     jobTitleInput.value = '';
     jobDescriptionInput.value = '';
+    // Reset Save Job button text
+    const saveJobBtn = document.getElementById('save-job');
+    if (saveJobBtn) {
+      saveJobBtn.classList.remove('has-extracted');
+    }
   }
 
   async function saveJobData() {
@@ -768,7 +773,7 @@ document.addEventListener('DOMContentLoaded', function () {
       }
 
       extractBtn.disabled = true;
-      extractBtn.textContent = 'Extracting...';
+      extractBtn.classList.add('loading');
 
       if (chrome && chrome.tabs && chrome.tabs.query) {
         chrome.tabs.query({ active: true, currentWindow: true }, async function (tabs) {
@@ -776,7 +781,7 @@ document.addEventListener('DOMContentLoaded', function () {
           if (!tabId) {
             alert('No active tab found for extraction');
             extractBtn.disabled = false;
-            extractBtn.textContent = 'Extract';
+            extractBtn.classList.remove('loading');
             return;
           }
 
@@ -792,7 +797,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }).catch((error) => {
                   alert('Failed to inject content script. Please refresh the page and try again.');
                   extractBtn.disabled = false;
-                  extractBtn.textContent = 'Extract';
+                  extractBtn.classList.remove('loading');
                 });
                 return;
               }
@@ -817,7 +822,7 @@ document.addEventListener('DOMContentLoaded', function () {
                   if (chrome.runtime.lastError) {
                     alert('Failed to communicate with content script. Please refresh the page and try again.');
                     extractBtn.disabled = false;
-                    extractBtn.textContent = 'Extract';
+                    extractBtn.classList.remove('loading');
                     return;
                   }
 
@@ -832,13 +837,13 @@ document.addEventListener('DOMContentLoaded', function () {
                       console.error('Extraction error:', extractionError);
                       alert('Failed to extract job data: ' + extractionError.message);
                       extractBtn.disabled = false;
-                      extractBtn.textContent = 'Extract';
+                      extractBtn.classList.remove('loading');
                     }
                   } else {
                     const errorMsg = response && response.error ? response.error : 'Unknown error';
                     alert('Failed to extract page content: ' + errorMsg);
                     extractBtn.disabled = false;
-                    extractBtn.textContent = 'Extract';
+                    extractBtn.classList.remove('loading');
                   }
                 });
               }
@@ -849,7 +854,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!extractedData) {
               alert('Failed to extract job data. Please try again.');
               extractBtn.disabled = false;
-              extractBtn.textContent = 'Extract';
+              extractBtn.classList.remove('loading');
               return;
             }
 
@@ -861,9 +866,15 @@ document.addEventListener('DOMContentLoaded', function () {
             // Show the modal so user can review and edit
             showJobModal();
             
-            // Reset button state
+            // Reset button state and remove loader
             extractBtn.disabled = false;
-            extractBtn.textContent = 'Extract';
+            extractBtn.classList.remove('loading');
+            
+            // Update Save Job button text to "Save Extracted Job"
+            const saveJobBtn = document.getElementById('save-job');
+            if (saveJobBtn) {
+              saveJobBtn.classList.add('has-extracted');
+            }
             
             console.log('Extracted data populated in form:', {
               company: companyNameInput.value,
@@ -877,13 +888,13 @@ document.addEventListener('DOMContentLoaded', function () {
       } else {
         alert('Chrome tabs API not available');
         extractBtn.disabled = false;
-        extractBtn.textContent = 'Extract';
+        extractBtn.classList.remove('loading');
       }
     } catch (err) {
       console.error('Extraction error:', err);
       alert('Extraction error: ' + err.message);
       extractBtn.disabled = false;
-      extractBtn.textContent = 'Extract';
+      extractBtn.classList.remove('loading');
     }
   });
 

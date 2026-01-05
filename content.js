@@ -41,9 +41,108 @@
       const qa = (sel) => Array.from(document.querySelectorAll(sel));
       const byPartialClass = (part) => `[class*="${part}"]`;
 
-      // Extract company name from <strong> inside h2 with ant-typography class
-      const companyElement = q('h2.ant-typography strong') || q(`${byPartialClass('company-row')} strong`) || q('h2 strong');
-      const companyName = companyElement ? companyElement.textContent.trim() : 'Unknown Company';
+
+      // Extract company name - MULTIPLE ROBUST STRATEGIES
+      let companyName = 'Unknown Company (job right)';
+      let companyElement = null;
+      
+      // Strategy 1: Direct selector for the exact structure
+      companyElement = q('h2.ant-typography[class*="company-row"] span[class*="company-name"]');
+      if (companyElement && companyElement.textContent.trim()) {
+        companyName = companyElement.textContent.trim();
+      }
+      
+      // Strategy 2: Find h2 with company-row, then find span with company-name inside
+      if (companyName === 'Unknown Company (job right)') {
+        const h2CompanyRow = q('h2[class*="company-row"]') || 
+                            q('h2.ant-typography[class*="company-row"]') ||
+                            qa('h2').find(h2 => h2.className && h2.className.includes('company-row'));
+        if (h2CompanyRow) {
+          companyElement = h2CompanyRow.querySelector('span[class*="company-name"]') ||
+                          h2CompanyRow.querySelector('span.index_company-name__RXcIy') ||
+                          Array.from(h2CompanyRow.querySelectorAll('span')).find(span => 
+                            span.className && span.className.includes('company-name')
+                          );
+          if (companyElement && companyElement.textContent.trim()) {
+            companyName = companyElement.textContent.trim();
+          }
+        }
+      }
+      
+      // Strategy 3: Search within jobIntroduction section
+      if (companyName === 'Unknown Company (job right)') {
+        const jobIntro = q('[class*="jobIntroduction"]') || q('[class*="job-introduction"]');
+        if (jobIntro) {
+          companyElement = jobIntro.querySelector('span[class*="company-name"]') ||
+                          jobIntro.querySelector('h2[class*="company-row"] span[class*="company-name"]');
+          if (companyElement && companyElement.textContent.trim()) {
+            companyName = companyElement.textContent.trim();
+          }
+        }
+      }
+      
+      // Strategy 4: Find all spans with company-name and pick the one in the job detail area
+      if (companyName === 'Unknown Company (job right)') {
+        const allCompanyNameSpans = qa('span[class*="company-name"]');
+        if (allCompanyNameSpans.length > 0) {
+          // Prefer the one inside h2 with company-row
+          companyElement = allCompanyNameSpans.find(span => {
+            const h2Parent = span.closest('h2[class*="company-row"]');
+            return h2Parent !== null;
+          });
+          if (companyElement && companyElement.textContent.trim()) {
+            companyName = companyElement.textContent.trim();
+          } else if (allCompanyNameSpans[0] && allCompanyNameSpans[0].textContent.trim()) {
+            // Fallback to first one if no better match
+            companyName = allCompanyNameSpans[0].textContent.trim();
+          }
+        }
+      }
+      
+      // Strategy 5: Find h2 with company-row and get first text node (excluding time span)
+      if (companyName === 'Unknown Company (job right)') {
+        const h2CompanyRow = q('h2[class*="company-row"]');
+        if (h2CompanyRow) {
+          // Get all spans, exclude the one with publish-time
+          const spans = h2CompanyRow.querySelectorAll('span');
+          companyElement = Array.from(spans).find(span => 
+            !span.className.includes('publish-time') && 
+            span.textContent.trim() &&
+            span.textContent.trim().length < 100 // Company names are usually short
+          );
+          if (companyElement && companyElement.textContent.trim()) {
+            companyName = companyElement.textContent.trim();
+          }
+        }
+      }
+      
+      // Strategy 6: Look for company name in the company summary section
+      if (companyName === 'Unknown Company (job right)') {
+        const companySummary = q('[class*="company-summary"]');
+        if (companySummary) {
+          const strongTag = companySummary.querySelector('strong');
+          if (strongTag && strongTag.textContent.trim()) {
+            companyName = strongTag.textContent.trim();
+          }
+        }
+      }
+      
+      // Strategy 7: Look in company section header
+      if (companyName === 'Unknown Company (job right)') {
+        const companySection = q('[id="company"]') || q('[class*="companyIntroduction"]');
+        if (companySection) {
+          const companyNameH2 = companySection.querySelector('h2[class*="companyName"]') ||
+                               companySection.querySelector('h2.index_companyName__gsqmt');
+          if (companyNameH2 && companyNameH2.textContent.trim()) {
+            companyName = companyNameH2.textContent.trim();
+          }
+        }
+      }
+      
+      // Final validation: ensure we got a valid company name
+      if (companyName === 'Unknown Company (job right)' || !companyName || companyName.length > 100) {
+        companyName = 'Unknown Company (job right)';
+      }
 
       // Extract job title from h1 with ant-typography class
       const jobTitleElement = q('h1.ant-typography') || q(`${byPartialClass('job-title')}`) || q('h1');
@@ -124,14 +223,14 @@
       // Helpers to query with resilient selectors
       const q = (sel) => document.querySelector(sel);
       const qa = (sel) => Array.from(document.querySelectorAll(sel));
-      
+
       // Focus on the main job details panel, not sidebar job lists
       // The main job details are typically in .jobs-details__main-content or similar
-      const mainJobContainer = q('.jobs-details__main-content') || 
-                               q('.job-details-jobs-unified-top-card__container') ||
-                               q('main') ||
-                               document.body;
-      
+      const mainJobContainer = q('.jobs-details__main-content') ||
+        q('.job-details-jobs-unified-top-card__container') ||
+        q('main') ||
+        document.body;
+
       // Create a scoped query function that searches within main container
       const qScoped = (sel) => {
         try {
@@ -163,7 +262,7 @@
 
       // Extract company name from job details - using scoped selectors to avoid sidebar jobs
       let companyName = 'Unknown Company';
-      
+
       // Try multiple selectors in order of specificity, scoped to main container
       const companySelectors = [
         '.job-details-jobs-unified-top-card__company-name a',
@@ -175,7 +274,7 @@
         '.artdeco-entity-lockup__title a',
         '.artdeco-entity-lockup__title'
       ];
-      
+
       let companyElement = null;
       for (const selector of companySelectors) {
         companyElement = qScoped(selector);
@@ -195,11 +294,11 @@
           }
         }
       }
-      
+
       // If still not found, try finding by text pattern near company-related elements
       if (companyName === 'Unknown Company') {
-        const companyDiv = qScoped('.job-details-jobs-unified-top-card__company-name') || 
-                          q('.job-details-jobs-unified-top-card__company-name');
+        const companyDiv = qScoped('.job-details-jobs-unified-top-card__company-name') ||
+          q('.job-details-jobs-unified-top-card__company-name');
         if (companyDiv && mainJobContainer.contains(companyDiv)) {
           const text = extractText(companyDiv);
           if (text) {
@@ -210,7 +309,7 @@
 
       // Extract job title - using scoped selectors to avoid sidebar jobs
       let jobTitle = 'Unknown Position';
-      
+
       // Try multiple selectors in order of specificity, scoped to main container
       const titleSelectors = [
         '.job-details-jobs-unified-top-card__job-title h1 a',
@@ -223,7 +322,7 @@
         'h1.t-24',
         'h1'
       ];
-      
+
       let titleElement = null;
       for (const selector of titleSelectors) {
         titleElement = qScoped(selector);
@@ -243,11 +342,11 @@
           }
         }
       }
-      
+
       // If still not found, try finding by text pattern
       if (jobTitle === 'Unknown Position') {
-        const titleDiv = qScoped('.job-details-jobs-unified-top-card__job-title') || 
-                        q('.job-details-jobs-unified-top-card__job-title');
+        const titleDiv = qScoped('.job-details-jobs-unified-top-card__job-title') ||
+          q('.job-details-jobs-unified-top-card__job-title');
         if (titleDiv && mainJobContainer.contains(titleDiv)) {
           const text = extractText(titleDiv);
           if (text) {
@@ -267,9 +366,9 @@
         qScoped('#job-details') ||
         qScoped('[class*="job-description"]') ||
         // Fallback to global if not found in scoped
-        (q('.jobs-description__content .jobs-box__html-content') && 
-         mainJobContainer.contains(q('.jobs-description__content .jobs-box__html-content')) ? 
-         q('.jobs-description__content .jobs-box__html-content') : null) ||
+        (q('.jobs-description__content .jobs-box__html-content') &&
+          mainJobContainer.contains(q('.jobs-description__content .jobs-box__html-content')) ?
+          q('.jobs-description__content .jobs-box__html-content') : null) ||
         (q('#job-details') && mainJobContainer.contains(q('#job-details')) ? q('#job-details') : null);
 
       if (descriptionElement) {
@@ -607,7 +706,7 @@
 
     console.log('=== LinkedIn Selector Debug ===');
     console.log('Current URL:', window.location.href);
-    
+
     console.log('\n--- Company Selectors ---');
     const companySelectors = [
       '.job-details-jobs-unified-top-card__company-name a',
@@ -717,9 +816,102 @@
       // Generic page scan for company and position
       const result = (function scanPageForCompanyAndTitle() {
         try {
-          const companyFromKnown = (document.querySelector('h2.ant-typography strong') || document.querySelector('[class*="company-row"] strong'));
+          // Extract company name - MULTIPLE ROBUST STRATEGIES (same as scrapeJobData)
+          let company = '';
+          let companyFromKnown = null;
+          
+          // Strategy 1: Direct selector for the exact structure
+          companyFromKnown = document.querySelector('h2.ant-typography[class*="company-row"] span[class*="company-name"]');
+          if (companyFromKnown && companyFromKnown.textContent.trim()) {
+            company = companyFromKnown.textContent.trim();
+          }
+          
+          // Strategy 2: Find h2 with company-row, then find span with company-name inside
+          if (!company) {
+            const h2CompanyRow = document.querySelector('h2[class*="company-row"]') || 
+                                document.querySelector('h2.ant-typography[class*="company-row"]') ||
+                                Array.from(document.querySelectorAll('h2')).find(h2 => h2.className && h2.className.includes('company-row'));
+            if (h2CompanyRow) {
+              companyFromKnown = h2CompanyRow.querySelector('span[class*="company-name"]') ||
+                                h2CompanyRow.querySelector('span.index_company-name__RXcIy') ||
+                                Array.from(h2CompanyRow.querySelectorAll('span')).find(span => 
+                                  span.className && span.className.includes('company-name')
+                                );
+              if (companyFromKnown && companyFromKnown.textContent.trim()) {
+                company = companyFromKnown.textContent.trim();
+              }
+            }
+          }
+          
+          // Strategy 3: Search within jobIntroduction section
+          if (!company) {
+            const jobIntro = document.querySelector('[class*="jobIntroduction"]') || document.querySelector('[class*="job-introduction"]');
+            if (jobIntro) {
+              companyFromKnown = jobIntro.querySelector('span[class*="company-name"]') ||
+                                jobIntro.querySelector('h2[class*="company-row"] span[class*="company-name"]');
+              if (companyFromKnown && companyFromKnown.textContent.trim()) {
+                company = companyFromKnown.textContent.trim();
+              }
+            }
+          }
+          
+          // Strategy 4: Find all spans with company-name and pick the one in the job detail area
+          if (!company) {
+            const allCompanyNameSpans = Array.from(document.querySelectorAll('span[class*="company-name"]'));
+            if (allCompanyNameSpans.length > 0) {
+              // Prefer the one inside h2 with company-row
+              companyFromKnown = allCompanyNameSpans.find(span => {
+                const h2Parent = span.closest('h2[class*="company-row"]');
+                return h2Parent !== null;
+              });
+              if (companyFromKnown && companyFromKnown.textContent.trim()) {
+                company = companyFromKnown.textContent.trim();
+              } else if (allCompanyNameSpans[0] && allCompanyNameSpans[0].textContent.trim()) {
+                company = allCompanyNameSpans[0].textContent.trim();
+              }
+            }
+          }
+          
+          // Strategy 5: Find h2 with company-row and get first text node (excluding time span)
+          if (!company) {
+            const h2CompanyRow = document.querySelector('h2[class*="company-row"]');
+            if (h2CompanyRow) {
+              const spans = h2CompanyRow.querySelectorAll('span');
+              companyFromKnown = Array.from(spans).find(span => 
+                !span.className.includes('publish-time') && 
+                span.textContent.trim() &&
+                span.textContent.trim().length < 100
+              );
+              if (companyFromKnown && companyFromKnown.textContent.trim()) {
+                company = companyFromKnown.textContent.trim();
+              }
+            }
+          }
+          
+          // Strategy 6: Look for company name in the company summary section
+          if (!company) {
+            const companySummary = document.querySelector('[class*="company-summary"]');
+            if (companySummary) {
+              const strongTag = companySummary.querySelector('strong');
+              if (strongTag && strongTag.textContent.trim()) {
+                company = strongTag.textContent.trim();
+              }
+            }
+          }
+          
+          // Strategy 7: Look in company section header
+          if (!company) {
+            const companySection = document.querySelector('[id="company"]') || document.querySelector('[class*="companyIntroduction"]');
+            if (companySection) {
+              const companyNameH2 = companySection.querySelector('h2[class*="companyName"]') ||
+                                   companySection.querySelector('h2.index_companyName__gsqmt');
+              if (companyNameH2 && companyNameH2.textContent.trim()) {
+                company = companyNameH2.textContent.trim();
+              }
+            }
+          }
+
           const titleFromKnown = (document.querySelector('h1.ant-typography') || document.querySelector('[class*="job-title"]'));
-          let company = companyFromKnown ? companyFromKnown.textContent.trim() : '';
           let position = titleFromKnown ? titleFromKnown.textContent.trim() : '';
 
           if (!position) {
@@ -767,7 +959,7 @@
     } else if (request.action === 'extractPageHtml') {
       try {
         let textContent = '';
-        
+
         // For LinkedIn job pages, focus on the currently viewed job only
         if (isLinkedInJobPage()) {
           // Try to get structured data first
@@ -782,14 +974,14 @@
           } else {
             // Fallback: Extract only from the main job details panel
             const mainJobPanel = document.querySelector('.jobs-details__main-content') ||
-                                document.querySelector('.job-details-jobs-unified-top-card__container') ||
-                                document.querySelector('.jobs-description__content') ||
-                                document.querySelector('#job-details');
-            
+              document.querySelector('.job-details-jobs-unified-top-card__container') ||
+              document.querySelector('.jobs-description__content') ||
+              document.querySelector('#job-details');
+
             if (mainJobPanel) {
               // Extract text only from the main job panel, excluding sidebar job lists
               textContent = mainJobPanel.innerText || mainJobPanel.textContent || '';
-              
+
               // Also try to get structured info from the top card
               const topCard = document.querySelector('.job-details-jobs-unified-top-card__container');
               if (topCard) {
@@ -803,17 +995,17 @@
               // Last resort: use body but try to exclude job list sidebars
               const jobListSidebars = document.querySelectorAll('.jobs-search-results-list, .jobs-search__results-list, [class*="jobs-search-results"]');
               const bodyClone = document.body.cloneNode(true);
-              
+
               // Remove job list sidebars from clone
               jobListSidebars.forEach(sidebar => {
                 const cloneSidebar = bodyClone.querySelector(`[class="${sidebar.className}"]`);
                 if (cloneSidebar) cloneSidebar.remove();
               });
-              
+
               textContent = bodyClone.innerText || bodyClone.textContent || '';
             }
           }
-        } 
+        }
         // For Indeed job pages, focus on the main job view
         else if (isIndeedJobPage()) {
           const structuredData = scrapeIndeedJobData();
@@ -829,10 +1021,10 @@
           } else {
             // Focus on main job view panel
             const mainJobView = document.querySelector('#jobDescriptionText') ||
-                               document.querySelector('.jobsearch-JobComponent-description') ||
-                               document.querySelector('#jobsearch-ViewjobPaneWrapper') ||
-                               document.querySelector('.jobsearch-ViewJobLayout--embedded');
-            
+              document.querySelector('.jobsearch-JobComponent-description') ||
+              document.querySelector('#jobsearch-ViewjobPaneWrapper') ||
+              document.querySelector('.jobsearch-ViewJobLayout--embedded');
+
             if (mainJobView) {
               textContent = mainJobView.innerText || mainJobView.textContent || '';
             } else {
