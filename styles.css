@@ -733,6 +733,7 @@ body {
   background: linear-gradient(to bottom, #ffffff 0%, #fafafa 100%);
   flex-wrap: wrap;
   position: relative;
+  overflow: visible;
 }
 
 .modal-footer::before {
@@ -748,7 +749,9 @@ body {
 .modal-footer-left {
   display: flex;
   align-items: center;
+  gap: 10px;
   flex: 1;
+  overflow: visible;
 }
 
 .modal-footer-right {
@@ -766,7 +769,7 @@ body {
 }
 
 .extract-btn {
-  padding: 11px 18px;
+  padding: 11px 20px;
   background: linear-gradient(135deg, #10b981 0%, #059669 100%);
   color: white;
   border: none;
@@ -777,11 +780,13 @@ body {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  gap: 6px;
   box-shadow: 0 2px 8px rgba(16, 185, 129, 0.25);
   letter-spacing: 0.2px;
+  width: 140px;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .extract-btn::before {
@@ -808,6 +813,115 @@ body {
 .extract-btn:active {
   transform: translateY(0);
 }
+
+/* Extract button tooltip */
+.extract-tooltip {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%) translateY(5px);
+  background-color: #1f2937;
+  color: white;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 400;
+  max-width: 280px;
+  min-width: 200px;
+  text-align: center;
+  line-height: 1.4;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  letter-spacing: 0;
+  word-wrap: break-word;
+  white-space: normal;
+}
+
+.extract-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: #1f2937;
+}
+
+.extract-btn:hover .extract-tooltip {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Extract button loader */
+.extract-loader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+}
+
+.extract-loader .spinner {
+  width: 16px;
+  height: 16px;
+  color: white;
+}
+
+.extract-loader .spinner-circle {
+  stroke: currentColor;
+  stroke-width: 2.5;
+  fill: none;
+  stroke-linecap: round;
+  stroke-dasharray: 31.416;
+  stroke-dashoffset: 31.416;
+  animation: extractSpin 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  transform-origin: center;
+}
+
+@keyframes extractSpin {
+  0% {
+    transform: rotate(0deg);
+    stroke-dashoffset: 31.416;
+  }
+  50% {
+    stroke-dashoffset: 7.854;
+  }
+  100% {
+    transform: rotate(360deg);
+    stroke-dashoffset: 31.416;
+  }
+}
+
+/* Hide icon and text when loading */
+.extract-btn.loading .extract-icon,
+.extract-btn.loading .extract-text {
+  display: none;
+}
+
+.extract-btn.loading .extract-loader {
+  display: flex !important;
+}
+
+/* Save Job button text update */
+.save-btn .save-text {
+  display: inline;
+}
+
+.save-btn .save-extracted-text {
+  display: none;
+}
+
+.save-btn.has-extracted .save-text {
+  display: none;
+}
+
+.save-btn.has-extracted .save-extracted-text {
+  display: inline;
+}
+
 
 .cancel-btn {
   padding: 11px 20px;
@@ -850,9 +964,10 @@ body {
   box-shadow: 0 2px 8px rgba(255, 87, 34, 0.25);
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   letter-spacing: 0.2px;
-  min-width: 120px;
+  width: 140px;
   position: relative;
   overflow: hidden;
 }
