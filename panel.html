@@ -125,6 +125,27 @@
     </div>
   </div>
 
+  <div id="extension-code-modal" class="modal hidden">
+    <div class="modal-content modal-content-sm">
+      <div class="modal-header">
+        <h3>Operator code</h3>
+        <button id="close-extension-code-modal" class="close-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="extension-code-hint">Enter the 5-digit code to add jobs as an operator. Code is valid for 24 hours.</p>
+        <div class="input-group">
+          <label for="extension-code-input">Code</label>
+          <input type="text" id="extension-code-input" inputmode="numeric" pattern="[0-9]*" maxlength="5" placeholder="12345" autocomplete="off">
+        </div>
+        <p id="extension-code-error" class="extension-code-error hidden"></p>
+      </div>
+      <div class="modal-footer">
+        <button id="verify-extension-code" class="save-btn">Verify & continue</button>
+        <button id="cancel-extension-code" class="cancel-btn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <div id="job-description-modal" class="modal hidden">
     <div class="modal-content">
       <div class="modal-header">

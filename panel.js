@@ -1,5 +1,105 @@
 import { API_URLS } from './exports.js';
 
+const EXTENSION_CODE_STORAGE_KEY = 'extension_operator_code';
+const EXTENSION_CODE_TTL_MS = 24 * 60 * 60 * 1000;
+const API_BASE = API_URLS.SAVE_TO_DASHBOARD.replace('/extension/saveToDashboard', '');
+
+function getStoredExtensionCode() {
+  try {
+    const raw = localStorage.getItem(EXTENSION_CODE_STORAGE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (data.expiresAt && Date.now() < data.expiresAt && data.code) return data;
+    localStorage.removeItem(EXTENSION_CODE_STORAGE_KEY);
+    return null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function saveExtensionCodeCache(code, name) {
+  try {
+    localStorage.setItem(EXTENSION_CODE_STORAGE_KEY, JSON.stringify({
+      code,
+      name: name || '',
+      expiresAt: Date.now() + EXTENSION_CODE_TTL_MS
+    }));
+  } catch (e) {}
+}
+
+function verifyExtensionCodeApi(code) {
+  return fetch(`${API_BASE}/api/extension-codes/verify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code: String(code).trim() })
+  }).then((r) => r.json());
+}
+
+function showExtensionCodeModal() {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('extension-code-modal');
+    const input = document.getElementById('extension-code-input');
+    const errorEl = document.getElementById('extension-code-error');
+    const verifyBtn = document.getElementById('verify-extension-code');
+    const cancelBtn = document.getElementById('cancel-extension-code');
+    const closeBtn = document.getElementById('close-extension-code-modal');
+    if (!modal || !input) {
+      resolve(null);
+      return;
+    }
+    function hideModal() {
+      modal.classList.add('hidden');
+      input.value = '';
+      errorEl.classList.add('hidden');
+      errorEl.textContent = '';
+    }
+    function done(value) {
+      hideModal();
+      resolve(value);
+    }
+    modal.classList.remove('hidden');
+    input.focus();
+    verifyBtn.onclick = async () => {
+      const code = input.value.trim();
+      if (code.length !== 5 || !/^\d{5}$/.test(code)) {
+        errorEl.textContent = 'Enter a valid 5-digit code.';
+        errorEl.classList.remove('hidden');
+        return;
+      }
+      verifyBtn.disabled = true;
+      errorEl.classList.add('hidden');
+      try {
+        const result = await verifyExtensionCodeApi(code);
+        if (result.valid && result.name !== undefined) {
+          saveExtensionCodeCache(code, result.name);
+          done({ code, name: result.name });
+        } else {
+          errorEl.textContent = result.error || 'Invalid code.';
+          errorEl.classList.remove('hidden');
+        }
+      } catch (err) {
+        errorEl.textContent = 'Network error. Try again.';
+        errorEl.classList.remove('hidden');
+      }
+      verifyBtn.disabled = false;
+    };
+    cancelBtn.onclick = () => done(null);
+    closeBtn.onclick = () => done(null);
+    modal.addEventListener('click', function clickOut(e) {
+      if (e.target === modal) {
+        modal.removeEventListener('click', clickOut);
+        done(null);
+      }
+    });
+  });
+}
+
+function getOrPromptExtensionCode() {
+  const stored = getStoredExtensionCode();
+  if (stored) return Promise.resolve({ code: stored.code, name: stored.name });
+  return showExtensionCodeModal();
+}
+
 document.addEventListener('DOMContentLoaded', function () {
   const loginForm = document.getElementById('login-form');
   const loginContainer = document.getElementById('login-container');
@@ -40,6 +140,36 @@ document.addEventListener('DOMContentLoaded', function () {
   let selectedClientName = '';
   let operatorEmail = '';
   let operatorName = '';
+  let autoExtractTimeoutId = null;
+  const AUTO_EXTRACT_DELAY_MS = 1 * 1000; // Wait 2s for scraping to fill; if still empty, auto-extract
+
+  function isJobFormEmpty() {
+    const company = (companyNameInput && companyNameInput.value || '').trim();
+    const title = (jobTitleInput && jobTitleInput.value || '').trim();
+    const desc = (jobDescriptionInput && jobDescriptionInput.value || '').trim();
+    const emptyCompany = !company || company === 'Unknown Company';
+    const emptyTitle = !title || title === 'Unknown Position';
+    const emptyDesc = !desc || desc.length < 20;
+    return emptyCompany && emptyTitle && emptyDesc;
+  }
+
+  function clearAutoExtractTimer() {
+    if (autoExtractTimeoutId) {
+      clearTimeout(autoExtractTimeoutId);
+      autoExtractTimeoutId = null;
+    }
+  }
+
+  function scheduleAutoExtract() {
+    clearAutoExtractTimer();
+    autoExtractTimeoutId = setTimeout(function () {
+      autoExtractTimeoutId = null;
+      if (!jobModal || jobModal.classList.contains('hidden')) return;
+      if (!extractBtn || extractBtn.disabled || extractBtn.classList.contains('loading')) return;
+      if (!isJobFormEmpty()) return;
+      extractBtn.click();
+    }, AUTO_EXTRACT_DELAY_MS);
+  }
 
   // localStorage functions
   function saveLoginData(users) {
@@ -608,9 +738,11 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     jobModal.classList.remove('hidden');
+    scheduleAutoExtract();
   }
 
   function hideJobModal() {
+    clearAutoExtractTimer();
     jobModal.classList.add('hidden');
     // Clear form
     companyNameInput.value = '';
@@ -633,10 +765,8 @@ document.addEventListener('DOMContentLoaded', function () {
       return;
     }
 
-    // Determine which emails to use
     let selectedEmails = [];
     if (operatorEmail && operatorEmail.endsWith('@flashfirehq')) {
-      // For operators: use selected client
       if (selectedClientEmail) {
         selectedEmails = [selectedClientEmail];
       } else {
@@ -644,7 +774,6 @@ document.addEventListener('DOMContentLoaded', function () {
         return;
       }
     } else {
-      // For non-operators: use selected users or logged in email
       selectedEmails = selectedUsers.map(id => {
         const user = allUsers.find(u => u._id === id);
         return user ? user.email : null;
@@ -654,126 +783,62 @@ document.addEventListener('DOMContentLoaded', function () {
       }
     }
 
-    // Get current URL
+    let extensionCodeToSend = undefined;
+    if (operatorEmail && operatorEmail.endsWith('@flashfirehq')) {
+      const ext = await getOrPromptExtensionCode();
+      if (!ext) {
+        alert('Operator code is required to add jobs.');
+        return;
+      }
+      extensionCodeToSend = ext.code;
+    }
+
+    const isOperator = operatorEmail && operatorEmail.endsWith('@flashfirehq');
+    const baseJobData = {
+      company: companyName,
+      position: jobTitle,
+      description: jobDescription,
+      selectedEmails,
+      savedAt: new Date().toISOString(),
+      operatorEmail: isOperator ? operatorEmail : undefined,
+      operatorName: isOperator ? operatorName : undefined,
+      extensionCode: extensionCodeToSend
+    };
+
     let currentUrl = 'Unknown URL';
     try {
       if (chrome && chrome.tabs && chrome.tabs.query) {
         chrome.tabs.query({ active: true, currentWindow: true }, async function (tabs) {
           currentUrl = (tabs && tabs[0] && tabs[0].url) ? tabs[0].url : 'Unknown URL';
-
-          const jobData = {
-            company: companyName,
-            position: jobTitle,
-            description: jobDescription,
-            url: currentUrl,
-            selectedEmails: selectedEmails,
-            savedAt: new Date().toISOString(),
-            operatorEmail: operatorEmail && operatorEmail.endsWith('@flashfirehq') ? operatorEmail : undefined,
-            operatorName: operatorEmail && operatorEmail.endsWith('@flashfirehq') ? operatorName : undefined
-          };
-
-          console.log('Saving job data:', jobData);
-
-          // Send to backend
-          try {
-            const response = await fetch(API_URLS.SAVE_TO_DASHBOARD, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify(jobData)
-            });
-
-            const responseData = await response.json();
-
-            if (response.ok) {
-              console.log('Job saved to dashboard successfully:', responseData);
-              alert('Job saved to dashboard successfully!');
-              hideJobModal();
-            } else {
-              console.error('Failed to save job:', responseData);
-              alert('Failed to save job: ' + (responseData.message || 'Unknown error'));
-            }
-          } catch (error) {
-            console.error('Error saving job:', error);
-            alert('Error saving job: ' + error.message);
-          }
+          const jobData = { ...baseJobData, url: currentUrl };
+          await sendJobToBackend(jobData);
         });
       } else {
-        const jobData = {
-          company: companyName,
-          position: jobTitle,
-          description: jobDescription,
-          url: currentUrl,
-          selectedEmails: selectedEmails,
-          savedAt: new Date().toISOString(),
-          operatorEmail: operatorEmail && operatorEmail.endsWith('@flashfirehq') ? operatorEmail : undefined,
-          operatorName: operatorEmail && operatorEmail.endsWith('@flashfirehq') ? operatorName : undefined
-        };
-
-        console.log('Saving job data:', jobData);
-
-        // Send to backend
-        try {
-          const response = await fetch(API_URLS.SAVE_TO_DASHBOARD, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(jobData)
-          });
-
-          const responseData = await response.json();
-
-          if (response.ok) {
-            console.log('Job saved to dashboard successfully:', responseData);
-            alert('Job saved to dashboard successfully!');
-            hideJobModal();
-          } else {
-            console.error('Failed to save job:', responseData);
-            alert('Failed to save job: ' + (responseData.message || 'Unknown error'));
-          }
-        } catch (error) {
-          console.error('Error saving job:', error);
-          alert('Error saving job: ' + error.message);
-        }
+        const jobData = { ...baseJobData, url: currentUrl };
+        await sendJobToBackend(jobData);
       }
     } catch (err) {
-      const jobData = {
-        company: companyName,
-        position: jobTitle,
-        description: jobDescription,
-        url: currentUrl,
-        selectedEmails: selectedEmails,
-        savedAt: new Date().toISOString()
-      };
+      const jobData = { ...baseJobData, url: currentUrl };
+      await sendJobToBackend(jobData);
+    }
+  }
 
-      console.log('Saving job data:', jobData);
-
-      // Send to backend
-      try {
-        const response = await fetch(API_URLS.SAVE_TO_DASHBOARD, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(jobData)
-        });
-
-        const responseData = await response.json();
-
-        if (response.ok) {
-          console.log('Job saved to dashboard successfully:', responseData);
-          alert('Job saved to dashboard successfully!');
-          hideJobModal();
-        } else {
-          console.error('Failed to save job:', responseData);
-          alert('Failed to save job: ' + (responseData.message || 'Unknown error'));
-        }
-      } catch (error) {
-        console.error('Error saving job:', error);
-        alert('Error saving job: ' + error.message);
+  async function sendJobToBackend(jobData) {
+    try {
+      const response = await fetch(API_URLS.SAVE_TO_DASHBOARD, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(jobData)
+      });
+      const responseData = await response.json();
+      if (response.ok) {
+        alert('Job saved to dashboard successfully!');
+        hideJobModal();
+      } else {
+        alert('Failed to save job: ' + (responseData.message || 'Unknown error'));
       }
+    } catch (error) {
+      alert('Error saving job: ' + error.message);
     }
   }
 
