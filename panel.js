@@ -1,5 +1,105 @@
 import { API_URLS } from './exports.js';
 
+const EXTENSION_CODE_STORAGE_KEY = 'extension_operator_code';
+const EXTENSION_CODE_TTL_MS = 24 * 60 * 60 * 1000;
+const API_BASE = API_URLS.SAVE_TO_DASHBOARD.replace('/extension/saveToDashboard', '');
+
+function getStoredExtensionCode() {
+  try {
+    const raw = localStorage.getItem(EXTENSION_CODE_STORAGE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (data.expiresAt && Date.now() < data.expiresAt && data.code) return data;
+    localStorage.removeItem(EXTENSION_CODE_STORAGE_KEY);
+    return null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function saveExtensionCodeCache(code, name) {
+  try {
+    localStorage.setItem(EXTENSION_CODE_STORAGE_KEY, JSON.stringify({
+      code,
+      name: name || '',
+      expiresAt: Date.now() + EXTENSION_CODE_TTL_MS
+    }));
+  } catch (e) {}
+}
+
+function verifyExtensionCodeApi(code) {
+  return fetch(`${API_BASE}/api/extension-codes/verify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code: String(code).trim() })
+  }).then((r) => r.json());
+}
+
+function showExtensionCodeModal() {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('extension-code-modal');
+    const input = document.getElementById('extension-code-input');
+    const errorEl = document.getElementById('extension-code-error');
+    const verifyBtn = document.getElementById('verify-extension-code');
+    const cancelBtn = document.getElementById('cancel-extension-code');
+    const closeBtn = document.getElementById('close-extension-code-modal');
+    if (!modal || !input) {
+      resolve(null);
+      return;
+    }
+    function hideModal() {
+      modal.classList.add('hidden');
+      input.value = '';
+      errorEl.classList.add('hidden');
+      errorEl.textContent = '';
+    }
+    function done(value) {
+      hideModal();
+      resolve(value);
+    }
+    modal.classList.remove('hidden');
+    input.focus();
+    verifyBtn.onclick = async () => {
+      const code = input.value.trim();
+      if (code.length !== 5 || !/^\d{5}$/.test(code)) {
+        errorEl.textContent = 'Enter a valid 5-digit code.';
+        errorEl.classList.remove('hidden');
+        return;
+      }
+      verifyBtn.disabled = true;
+      errorEl.classList.add('hidden');
+      try {
+        const result = await verifyExtensionCodeApi(code);
+        if (result.valid && result.name !== undefined) {
+          saveExtensionCodeCache(code, result.name);
+          done({ code, name: result.name });
+        } else {
+          errorEl.textContent = result.error || 'Invalid code.';
+          errorEl.classList.remove('hidden');
+        }
+      } catch (err) {
+        errorEl.textContent = 'Network error. Try again.';
+        errorEl.classList.remove('hidden');
+      }
+      verifyBtn.disabled = false;
+    };
+    cancelBtn.onclick = () => done(null);
+    closeBtn.onclick = () => done(null);
+    modal.addEventListener('click', function clickOut(e) {
+      if (e.target === modal) {
+        modal.removeEventListener('click', clickOut);
+        done(null);
+      }
+    });
+  });
+}
+
+function getOrPromptExtensionCode() {
+  const stored = getStoredExtensionCode();
+  if (stored) return Promise.resolve({ code: stored.code, name: stored.name });
+  return showExtensionCodeModal();
+}
+
 document.addEventListener('DOMContentLoaded', function () {
   const loginForm = document.getElementById('login-form');
   const loginContainer = document.getElementById('login-container');
@@ -36,6 +136,40 @@ document.addEventListener('DOMContentLoaded', function () {
   let selectedUsers = [];
   let loggedInEmail = '';
   let loggedInName = '';
+  let selectedClientEmail = ''; // For operator: single selected client
+  let selectedClientName = '';
+  let operatorEmail = '';
+  let operatorName = '';
+  let autoExtractTimeoutId = null;
+  const AUTO_EXTRACT_DELAY_MS = 1 * 1000; // Wait 2s for scraping to fill; if still empty, auto-extract
+
+  function isJobFormEmpty() {
+    const company = (companyNameInput && companyNameInput.value || '').trim();
+    const title = (jobTitleInput && jobTitleInput.value || '').trim();
+    const desc = (jobDescriptionInput && jobDescriptionInput.value || '').trim();
+    const emptyCompany = !company || company === 'Unknown Company';
+    const emptyTitle = !title || title === 'Unknown Position';
+    const emptyDesc = !desc || desc.length < 20;
+    return emptyCompany && emptyTitle && emptyDesc;
+  }
+
+  function clearAutoExtractTimer() {
+    if (autoExtractTimeoutId) {
+      clearTimeout(autoExtractTimeoutId);
+      autoExtractTimeoutId = null;
+    }
+  }
+
+  function scheduleAutoExtract() {
+    clearAutoExtractTimer();
+    autoExtractTimeoutId = setTimeout(function () {
+      autoExtractTimeoutId = null;
+      if (!jobModal || jobModal.classList.contains('hidden')) return;
+      if (!extractBtn || extractBtn.disabled || extractBtn.classList.contains('loading')) return;
+      if (!isJobFormEmpty()) return;
+      extractBtn.click();
+    }, AUTO_EXTRACT_DELAY_MS);
+  }
 
   // localStorage functions
   function saveLoginData(users) {
@@ -43,6 +177,29 @@ document.addEventListener('DOMContentLoaded', function () {
       users: users,
       timestamp: Date.now()
     }));
+  }
+  function saveSelectedClient(email, name) {
+    localStorage.setItem('extension_selected_client', JSON.stringify({
+      email: email,
+      name: name || '',
+      timestamp: Date.now()
+    }));
+  }
+  function loadSelectedClient() {
+    try {
+      const data = localStorage.getItem('extension_selected_client');
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (Date.now() - parsed.timestamp < 24 * 60 * 60 * 1000) {
+          return { email: parsed.email || '', name: parsed.name || '' };
+        } else {
+          localStorage.removeItem('extension_selected_client');
+        }
+      }
+    } catch (error) {
+      localStorage.removeItem('extension_selected_client');
+    }
+    return null;
   }
   function saveClientLogin(email, name) {
     localStorage.setItem('extension_client_login', JSON.stringify({
@@ -240,6 +397,7 @@ document.addEventListener('DOMContentLoaded', function () {
   function clearLoginData() {
     localStorage.removeItem('extension_login_data');
     localStorage.removeItem('extension_client_login');
+    localStorage.removeItem('extension_selected_client');
   }
 
   // Check for existing login data on page load
@@ -248,6 +406,19 @@ document.addEventListener('DOMContentLoaded', function () {
     if (savedUsers && savedUsers.length > 0) {
       allUsers = savedUsers;
       selectedUsers = [];
+      
+      // Load selected client if exists
+      const savedClient = loadSelectedClient();
+      if (savedClient && savedClient.email) {
+        selectedClientEmail = savedClient.email;
+        selectedClientName = savedClient.name;
+        // Find and select the client in the list
+        const clientUser = allUsers.find(u => u.email === savedClient.email);
+        if (clientUser) {
+          selectedUsers = [clientUser._id];
+        }
+      }
+      
       renderUsers(allUsers);
       loginContainer.classList.add('hidden');
       mainContainer.classList.remove('hidden');
@@ -391,7 +562,17 @@ document.addEventListener('DOMContentLoaded', function () {
       if (isAdmin) {
         allUsers = data.users || [];
         selectedUsers = [];
+        operatorEmail = data.operatorEmail || email;
+        operatorName = data.operatorName || '';
         saveLoginData(allUsers);
+        
+        // Load previously selected client if exists
+        const savedClient = loadSelectedClient();
+        if (savedClient && savedClient.email) {
+          selectedClientEmail = savedClient.email;
+          selectedClientName = savedClient.name;
+        }
+        
         renderUsers(allUsers);
         loginContainer.classList.add('hidden');
         mainContainer.classList.remove('hidden');
@@ -474,8 +655,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // Handle Add Jobs button
   addJobsBtn.addEventListener('click', function () {
-    // For admin flow we require selection; for client flow we allow zero because we'll inject their email later
-    if (!loggedInEmail && selectedUsers.length === 0) {
+    // For operator: require selected client
+    if (operatorEmail && operatorEmail.endsWith('@flashfirehq')) {
+      if (!selectedClientEmail) {
+        alert('Please select a client before adding jobs.');
+        return;
+      }
+    } else if (!loggedInEmail && selectedUsers.length === 0) {
+      // For non-operators: require selection
       alert('Please select at least one user before adding jobs.');
       return;
     }
@@ -496,6 +683,10 @@ document.addEventListener('DOMContentLoaded', function () {
     clearLoginData();
     allUsers = [];
     selectedUsers = [];
+    selectedClientEmail = '';
+    selectedClientName = '';
+    operatorEmail = '';
+    operatorName = '';
     loginContainer.classList.remove('hidden');
     mainContainer.classList.add('hidden');
     // Clear form
@@ -547,9 +738,11 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     jobModal.classList.remove('hidden');
+    scheduleAutoExtract();
   }
 
   function hideJobModal() {
+    clearAutoExtractTimer();
     jobModal.classList.add('hidden');
     // Clear form
     companyNameInput.value = '';
@@ -572,130 +765,80 @@ document.addEventListener('DOMContentLoaded', function () {
       return;
     }
 
-    let selectedEmails = selectedUsers.map(id => {
-      const user = allUsers.find(u => u._id === id);
-      return user ? user.email : null;
-    }).filter(email => email !== null);
-    if (!selectedEmails.length && loggedInEmail) {
-      selectedEmails = [loggedInEmail];
+    let selectedEmails = [];
+    if (operatorEmail && operatorEmail.endsWith('@flashfirehq')) {
+      if (selectedClientEmail) {
+        selectedEmails = [selectedClientEmail];
+      } else {
+        alert('Please select a client before adding jobs.');
+        return;
+      }
+    } else {
+      selectedEmails = selectedUsers.map(id => {
+        const user = allUsers.find(u => u._id === id);
+        return user ? user.email : null;
+      }).filter(email => email !== null);
+      if (!selectedEmails.length && loggedInEmail) {
+        selectedEmails = [loggedInEmail];
+      }
     }
 
-    // Get current URL
+    let extensionCodeToSend = undefined;
+    if (operatorEmail && operatorEmail.endsWith('@flashfirehq')) {
+      const ext = await getOrPromptExtensionCode();
+      if (!ext) {
+        alert('Operator code is required to add jobs.');
+        return;
+      }
+      extensionCodeToSend = ext.code;
+    }
+
+    const isOperator = operatorEmail && operatorEmail.endsWith('@flashfirehq');
+    const baseJobData = {
+      company: companyName,
+      position: jobTitle,
+      description: jobDescription,
+      selectedEmails,
+      savedAt: new Date().toISOString(),
+      operatorEmail: isOperator ? operatorEmail : undefined,
+      operatorName: isOperator ? operatorName : undefined,
+      extensionCode: extensionCodeToSend
+    };
+
     let currentUrl = 'Unknown URL';
     try {
       if (chrome && chrome.tabs && chrome.tabs.query) {
         chrome.tabs.query({ active: true, currentWindow: true }, async function (tabs) {
           currentUrl = (tabs && tabs[0] && tabs[0].url) ? tabs[0].url : 'Unknown URL';
-
-          const jobData = {
-            company: companyName,
-            position: jobTitle,
-            description: jobDescription,
-            url: currentUrl,
-            selectedEmails: selectedEmails,
-            savedAt: new Date().toISOString()
-          };
-
-          console.log('Saving job data:', jobData);
-
-          // Send to backend
-          try {
-            const response = await fetch(API_URLS.SAVE_TO_DASHBOARD, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify(jobData)
-            });
-
-            const responseData = await response.json();
-
-            if (response.ok) {
-              console.log('Job saved to dashboard successfully:', responseData);
-              alert('Job saved to dashboard successfully!');
-              hideJobModal();
-            } else {
-              console.error('Failed to save job:', responseData);
-              alert('Failed to save job: ' + (responseData.message || 'Unknown error'));
-            }
-          } catch (error) {
-            console.error('Error saving job:', error);
-            alert('Error saving job: ' + error.message);
-          }
+          const jobData = { ...baseJobData, url: currentUrl };
+          await sendJobToBackend(jobData);
         });
       } else {
-        const jobData = {
-          company: companyName,
-          position: jobTitle,
-          description: jobDescription,
-          url: currentUrl,
-          selectedEmails: selectedEmails,
-          savedAt: new Date().toISOString()
-        };
-
-        console.log('Saving job data:', jobData);
-
-        // Send to backend
-        try {
-          const response = await fetch(API_URLS.SAVE_TO_DASHBOARD, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(jobData)
-          });
-
-          const responseData = await response.json();
-
-          if (response.ok) {
-            console.log('Job saved to dashboard successfully:', responseData);
-            alert('Job saved to dashboard successfully!');
-            hideJobModal();
-          } else {
-            console.error('Failed to save job:', responseData);
-            alert('Failed to save job: ' + (responseData.message || 'Unknown error'));
-          }
-        } catch (error) {
-          console.error('Error saving job:', error);
-          alert('Error saving job: ' + error.message);
-        }
+        const jobData = { ...baseJobData, url: currentUrl };
+        await sendJobToBackend(jobData);
       }
     } catch (err) {
-      const jobData = {
-        company: companyName,
-        position: jobTitle,
-        description: jobDescription,
-        url: currentUrl,
-        selectedEmails: selectedEmails,
-        savedAt: new Date().toISOString()
-      };
+      const jobData = { ...baseJobData, url: currentUrl };
+      await sendJobToBackend(jobData);
+    }
+  }
 
-      console.log('Saving job data:', jobData);
-
-      // Send to backend
-      try {
-        const response = await fetch(API_URLS.SAVE_TO_DASHBOARD, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(jobData)
-        });
-
-        const responseData = await response.json();
-
-        if (response.ok) {
-          console.log('Job saved to dashboard successfully:', responseData);
-          alert('Job saved to dashboard successfully!');
-          hideJobModal();
-        } else {
-          console.error('Failed to save job:', responseData);
-          alert('Failed to save job: ' + (responseData.message || 'Unknown error'));
-        }
-      } catch (error) {
-        console.error('Error saving job:', error);
-        alert('Error saving job: ' + error.message);
+  async function sendJobToBackend(jobData) {
+    try {
+      const response = await fetch(API_URLS.SAVE_TO_DASHBOARD, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(jobData)
+      });
+      const responseData = await response.json();
+      if (response.ok) {
+        alert('Job saved to dashboard successfully!');
+        hideJobModal();
+      } else {
+        alert('Failed to save job: ' + (responseData.message || 'Unknown error'));
       }
+    } catch (error) {
+      alert('Error saving job: ' + error.message);
     }
   }
 
@@ -755,21 +898,33 @@ document.addEventListener('DOMContentLoaded', function () {
 
   extractBtn.addEventListener('click', async function () {
     try {
-      if (selectedUsers.length === 0 && !loggedInEmail) {
-        alert('Please select at least one user before extracting.');
-        return;
-      }
+      // Determine which emails to use
+      let selectedEmails = [];
+      if (operatorEmail && operatorEmail.endsWith('@flashfirehq')) {
+        // For operators: use selected client
+        if (selectedClientEmail) {
+          selectedEmails = [selectedClientEmail];
+        } else {
+          alert('Please select a client before extracting.');
+          return;
+        }
+      } else {
+        // For non-operators: use selected users or logged in email
+        if (selectedUsers.length === 0 && !loggedInEmail) {
+          alert('Please select at least one user before extracting.');
+          return;
+        }
+        selectedEmails = selectedUsers.length > 0 
+          ? selectedUsers.map(id => {
+              const user = allUsers.find(u => u._id === id);
+              return user ? user.email : null;
+            }).filter(email => email !== null)
+          : loggedInEmail ? [loggedInEmail] : [];
 
-      const selectedEmails = selectedUsers.length > 0 
-        ? selectedUsers.map(id => {
-            const user = allUsers.find(u => u._id === id);
-            return user ? user.email : null;
-          }).filter(email => email !== null)
-        : loggedInEmail ? [loggedInEmail] : [];
-
-      if (selectedEmails.length === 0) {
-        alert('Please select at least one user before extracting.');
-        return;
+        if (selectedEmails.length === 0) {
+          alert('Please select at least one user before extracting.');
+          return;
+        }
       }
 
       extractBtn.disabled = true;
@@ -909,17 +1064,20 @@ document.addEventListener('DOMContentLoaded', function () {
 
     users.forEach(user => {
       const userCard = document.createElement('div');
-      userCard.className = 'user-card';
-
       const isSelected = selectedUsers.includes(user._id);
+      const isSelectedClient = (operatorEmail && operatorEmail.endsWith('@flashfirehq') && selectedClientEmail === user.email);
+      userCard.className = `user-card ${isSelectedClient ? 'selected-client' : ''}`;
 
+      const selectionIndicator = isSelectedClient ? '<span class="selected-indicator">✓ Selected</span>' : '';
+      const inputType = (operatorEmail && operatorEmail.endsWith('@flashfirehq')) ? 'radio' : 'checkbox';
+      const inputName = (operatorEmail && operatorEmail.endsWith('@flashfirehq')) ? 'client-selection' : '';
       userCard.innerHTML = `
           <div class="user-info">
-            <h3>${user.name}</h3>
+            <h3>${user.name} ${selectionIndicator}</h3>
             <p>${user.email}</p>
           </div>
           <div class="checkbox-container">
-            <input type="checkbox" class="user-checkbox" data-id="${user._id}" ${isSelected ? 'checked' : ''}>
+            <input type="${inputType}" ${inputName ? `name="${inputName}"` : ''} class="user-checkbox" data-id="${user._id}" ${isSelectedClient || isSelected ? 'checked' : ''}>
             <span class="checkmark"></span>
           </div>
         `;
@@ -933,16 +1091,34 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const checkbox = userCard.querySelector('.user-checkbox');
         const userId = checkbox.dataset.id;
+        const user = allUsers.find(u => u._id === userId);
 
-        // Toggle checkbox
-        checkbox.checked = !checkbox.checked;
-
-        if (checkbox.checked) {
-          if (!selectedUsers.includes(userId)) {
-            selectedUsers.push(userId);
-          }
+        // For operators: select single client (not multiple)
+        if (operatorEmail && operatorEmail.endsWith('@flashfirehq')) {
+          // Clear all selections
+          selectedUsers = [];
+          document.querySelectorAll('.user-checkbox').forEach(cb => cb.checked = false);
+          
+          // Select this client
+          checkbox.checked = true;
+          selectedUsers = [userId];
+          selectedClientEmail = user ? user.email : '';
+          selectedClientName = user ? user.name : '';
+          saveSelectedClient(selectedClientEmail, selectedClientName);
+          
+          // Re-render to show selected state
+          renderUsers(allUsers);
         } else {
-          selectedUsers = selectedUsers.filter(id => id !== userId);
+          // For non-operators: toggle checkbox (multiple selection)
+          checkbox.checked = !checkbox.checked;
+
+          if (checkbox.checked) {
+            if (!selectedUsers.includes(userId)) {
+              selectedUsers.push(userId);
+            }
+          } else {
+            selectedUsers = selectedUsers.filter(id => id !== userId);
+          }
         }
       });
     });
@@ -951,13 +1127,35 @@ document.addEventListener('DOMContentLoaded', function () {
     document.querySelectorAll('.user-checkbox').forEach(checkbox => {
       checkbox.addEventListener('change', function () {
         const userId = this.dataset.id;
+        const user = allUsers.find(u => u._id === userId);
 
-        if (this.checked) {
-          if (!selectedUsers.includes(userId)) {
-            selectedUsers.push(userId);
+        // For operators: single client selection
+        if (operatorEmail && operatorEmail.endsWith('@flashfirehq')) {
+          if (this.checked) {
+            // Clear all other selections
+            selectedUsers = [];
+            document.querySelectorAll('.user-checkbox').forEach(cb => {
+              if (cb !== this) cb.checked = false;
+            });
+            selectedUsers = [userId];
+            selectedClientEmail = user ? user.email : '';
+            selectedClientName = user ? user.name : '';
+            saveSelectedClient(selectedClientEmail, selectedClientName);
+          } else {
+            selectedUsers = [];
+            selectedClientEmail = '';
+            selectedClientName = '';
+            localStorage.removeItem('extension_selected_client');
           }
         } else {
-          selectedUsers = selectedUsers.filter(id => id !== userId);
+          // For non-operators: multiple selection
+          if (this.checked) {
+            if (!selectedUsers.includes(userId)) {
+              selectedUsers.push(userId);
+            }
+          } else {
+            selectedUsers = selectedUsers.filter(id => id !== userId);
+          }
         }
       });
     });

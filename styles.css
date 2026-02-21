@@ -422,6 +422,25 @@ body {
   border-color: #ff5722;
 }
 
+.user-card.selected-client {
+  background: linear-gradient(135deg, #fff5f0 0%, #ffffff 100%);
+  border: 2px solid #ff5722;
+  box-shadow: 0 4px 12px rgba(255, 87, 34, 0.2), 0 0 0 1px rgba(255, 87, 34, 0.3);
+}
+
+.selected-indicator {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  background: #ff5722;
+  color: white;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
 /* ========== CHECKBOX ========== */
 .checkbox-container {
   display: flex;
@@ -626,6 +645,26 @@ body {
   overflow-y: auto;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   animation: modalSlideIn 0.3s ease-out;
+}
+
+.modal-content-sm {
+  max-width: 380px;
+}
+
+.extension-code-hint {
+  font-size: 13px;
+  color: #6b7280;
+  margin-bottom: 16px;
+}
+
+.extension-code-error {
+  color: #dc2626;
+  font-size: 13px;
+  margin-top: 8px;
+}
+
+.extension-code-error.hidden {
+  display: none;
 }
 
 @keyframes modalSlideIn {
