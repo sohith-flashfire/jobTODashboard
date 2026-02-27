@@ -143,6 +143,67 @@ document.addEventListener('DOMContentLoaded', function () {
   let autoExtractTimeoutId = null;
   const AUTO_EXTRACT_DELAY_MS = 1 * 1000; // Wait 2s for scraping to fill; if still empty, auto-extract
 
+  // Store URL from extraction/auto-fill to avoid mismatch when user switches tabs before saving
+  let lastExtractionSourceUrl = null;
+
+  // Capture the tab ID this panel belongs to at load time.
+  // This prevents wrong-tab messaging when the user switches tabs before saving/extracting.
+  let panelTabId = null;
+  (function captureTabId() {
+    if (chrome && chrome.tabs && chrome.tabs.query) {
+      chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+        if (tabs && tabs[0]) {
+          panelTabId = tabs[0].id;
+        }
+      });
+    }
+  })();
+
+  // Helper: get this panel's tab ID reliably. Uses cached ID if available,
+  // falls back to querying (and caching) the active tab.
+  function getMyTabId(callback) {
+    if (panelTabId) {
+      callback(panelTabId);
+      return;
+    }
+    if (chrome && chrome.tabs && chrome.tabs.query) {
+      chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+        const tabId = tabs && tabs[0] ? tabs[0].id : undefined;
+        if (tabId) panelTabId = tabId;
+        callback(tabId);
+      });
+    } else {
+      callback(undefined);
+    }
+  }
+
+  // Helper: get this panel's tab URL reliably.
+  function getMyTabUrl(callback) {
+    if (panelTabId && chrome && chrome.tabs && chrome.tabs.get) {
+      chrome.tabs.get(panelTabId, function (tab) {
+        if (chrome.runtime.lastError || !tab) {
+          callback('Unknown URL');
+        } else {
+          callback(tab.url || 'Unknown URL');
+        }
+      });
+    } else {
+      getMyTabId(function (tabId) {
+        if (tabId && chrome && chrome.tabs && chrome.tabs.get) {
+          chrome.tabs.get(tabId, function (tab) {
+            if (chrome.runtime.lastError || !tab) {
+              callback('Unknown URL');
+            } else {
+              callback(tab.url || 'Unknown URL');
+            }
+          });
+        } else {
+          callback('Unknown URL');
+        }
+      });
+    }
+  }
+
   function isJobFormEmpty() {
     const company = (companyNameInput && companyNameInput.value || '').trim();
     const title = (jobTitleInput && jobTitleInput.value || '').trim();
@@ -696,20 +757,26 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // Modal functions
   function showJobModal() {
-    // Try to auto-fill from current page if it's a jobright.ai page
+    // Try to auto-fill from current page if it's a job page.
+    // Uses stored panelTabId to always message the correct tab.
     try {
-      if (chrome && chrome.tabs && chrome.tabs.query) {
-        chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-          const currentUrl = (tabs && tabs[0] && tabs[0].url) ? tabs[0].url : undefined;
+      getMyTabId(function (tabId) {
+        if (!tabId) return;
+        chrome.tabs.get(tabId, function (tab) {
+          if (chrome.runtime.lastError || !tab) return;
+          const currentUrl = tab.url || '';
 
           if (currentUrl && (currentUrl.includes('jobright.ai/jobs/info/') ||
             currentUrl.includes('linkedin.com/jobs/view/') ||
             currentUrl.includes('linkedin.com/jobs/collections/') ||
             currentUrl.includes('currentJobId=') ||
             currentUrl.includes('indeed.com'))) {
-            // Try to get job data from the content script
             try {
-              chrome.tabs.sendMessage(tabs[0].id, { action: 'getJobData' }, function (response) {
+              chrome.tabs.sendMessage(tabId, { action: 'getJobData' }, function (response) {
+                if (chrome.runtime.lastError) {
+                  console.log('Could not auto-fill job data:', chrome.runtime.lastError.message);
+                  return;
+                }
                 console.log('Panel received response from content script:', response);
                 if (response && response.jobData) {
                   const jobData = response.jobData;
@@ -717,6 +784,7 @@ document.addEventListener('DOMContentLoaded', function () {
                   companyNameInput.value = jobData.company || '';
                   jobTitleInput.value = jobData.position || '';
                   jobDescriptionInput.value = jobData.description || '';
+                  lastExtractionSourceUrl = jobData.url || null;
                   console.log('Panel form fields populated:', {
                     company: companyNameInput.value,
                     title: jobTitleInput.value,
@@ -732,7 +800,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
           }
         });
-      }
+      });
     } catch (err) {
       console.log('Error getting current tab:', err);
     }
@@ -743,6 +811,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   function hideJobModal() {
     clearAutoExtractTimer();
+    lastExtractionSourceUrl = null;
     jobModal.classList.add('hidden');
     // Clear form
     companyNameInput.value = '';
@@ -765,12 +834,17 @@ document.addEventListener('DOMContentLoaded', function () {
       return;
     }
 
+    // Prevent double-click / race condition: disable save until request completes
+    if (saveJobBtn.disabled) return;
+    saveJobBtn.disabled = true;
+
     let selectedEmails = [];
     if (operatorEmail && operatorEmail.endsWith('@flashfirehq')) {
       if (selectedClientEmail) {
         selectedEmails = [selectedClientEmail];
       } else {
         alert('Please select a client before adding jobs.');
+        saveJobBtn.disabled = false;
         return;
       }
     } else {
@@ -788,6 +862,7 @@ document.addEventListener('DOMContentLoaded', function () {
       const ext = await getOrPromptExtensionCode();
       if (!ext) {
         alert('Operator code is required to add jobs.');
+        saveJobBtn.disabled = false;
         return;
       }
       extensionCodeToSend = ext.code;
@@ -805,21 +880,26 @@ document.addEventListener('DOMContentLoaded', function () {
       extensionCode: extensionCodeToSend
     };
 
-    let currentUrl = 'Unknown URL';
-    try {
-      if (chrome && chrome.tabs && chrome.tabs.query) {
-        chrome.tabs.query({ active: true, currentWindow: true }, async function (tabs) {
-          currentUrl = (tabs && tabs[0] && tabs[0].url) ? tabs[0].url : 'Unknown URL';
-          const jobData = { ...baseJobData, url: currentUrl };
-          await sendJobToBackend(jobData);
+    // Use URL from extraction/auto-fill if available (avoids mismatch when user switches tabs).
+    // Fallback: use the stored panelTabId to get the correct tab's URL instead of querying active tab.
+    let urlToUse = lastExtractionSourceUrl;
+    if (!urlToUse) {
+      try {
+        urlToUse = await new Promise((resolve) => {
+          getMyTabUrl(resolve);
         });
-      } else {
-        const jobData = { ...baseJobData, url: currentUrl };
-        await sendJobToBackend(jobData);
+      } catch (e) {
+        urlToUse = 'Unknown URL';
       }
-    } catch (err) {
-      const jobData = { ...baseJobData, url: currentUrl };
+    }
+    if (!urlToUse) urlToUse = 'Unknown URL';
+
+    const jobData = { ...baseJobData, url: urlToUse };
+    lastExtractionSourceUrl = null; // Clear after use
+    try {
       await sendJobToBackend(jobData);
+    } finally {
+      saveJobBtn.disabled = false;
     }
   }
 
@@ -832,8 +912,15 @@ document.addEventListener('DOMContentLoaded', function () {
       });
       const responseData = await response.json();
       if (response.ok) {
-        alert('Job saved to dashboard successfully!');
-        hideJobModal();
+        const summary = responseData.summary || {};
+        if (summary.skippedAsDuplicate > 0 && summary.saved === 0) {
+          alert('This job already exists in your dashboard. Duplicate not added.');
+        } else if (summary.saved > 0) {
+          alert('Job saved to dashboard successfully!');
+          hideJobModal();
+        } else {
+          alert(responseData.message || 'Job saving process completed.');
+        }
       } else {
         alert('Failed to save job: ' + (responseData.message || 'Unknown error'));
       }
@@ -930,9 +1017,8 @@ document.addEventListener('DOMContentLoaded', function () {
       extractBtn.disabled = true;
       extractBtn.classList.add('loading');
 
-      if (chrome && chrome.tabs && chrome.tabs.query) {
-        chrome.tabs.query({ active: true, currentWindow: true }, async function (tabs) {
-          const tabId = tabs && tabs[0] ? tabs[0].id : undefined;
+      // Use stored tab ID to always extract from the correct tab
+      getMyTabId(async function (tabId) {
           if (!tabId) {
             alert('No active tab found for extraction');
             extractBtn.disabled = false;
@@ -968,6 +1054,7 @@ document.addEventListener('DOMContentLoaded', function () {
                   position: structuredResponse.jobData.position,
                   description: structuredResponse.jobData.description || ''
                 };
+                lastExtractionSourceUrl = structuredResponse.jobData.url || null;
                 console.log('Using structured job data:', extractedData);
                 processExtractedData(extractedData, selectedEmails);
               } else {
@@ -986,6 +1073,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                     try {
                       extractedData = await extractJobDataWithOpenAI(content, websiteUrl);
+                      lastExtractionSourceUrl = websiteUrl || null;
                       console.log('Using AI-extracted job data:', extractedData);
                       processExtractedData(extractedData, selectedEmails);
                     } catch (extractionError) {
@@ -1040,11 +1128,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
           tryExtraction();
         });
-      } else {
-        alert('Chrome tabs API not available');
-        extractBtn.disabled = false;
-        extractBtn.classList.remove('loading');
-      }
     } catch (err) {
       console.error('Extraction error:', err);
       alert('Extraction error: ' + err.message);

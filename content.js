@@ -619,7 +619,9 @@
     const url = location.href;
     if (url !== lastUrl) {
       lastUrl = url;
-      setTimeout(updateJobData, 1000); // Wait for page to load
+      // Clear stale data immediately to prevent serving old job data with wrong URL
+      currentJobData = null;
+      setTimeout(updateJobData, 1000); // Wait for page to load, then re-scrape
     }
   }).observe(document, { subtree: true, childList: true });
 
