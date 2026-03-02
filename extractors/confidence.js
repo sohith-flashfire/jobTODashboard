@@ -119,13 +119,18 @@
           }
         }
 
-        // Use URL from highest-confidence source
-        if (r.data.url && r.data.url !== window.location.href) {
+        // Use URL from any layer; prefer canonical job URL, fallback to current page URL
+        var layerUrl = (r.data.url || '').trim();
+        if (layerUrl && /^https?:\/\//.test(layerUrl)) {
           if (!fieldBestScore['url'] || r.layerConfidence > (fieldBestScore['url'] || 0)) {
-            merged.url = r.data.url;
+            merged.url = layerUrl;
             fieldBestScore['url'] = r.layerConfidence;
           }
         }
+      }
+      // Always ensure we have a valid URL (current page as final fallback)
+      if (!merged.url || !/^https?:\/\//.test(merged.url)) {
+        merged.url = window.location.href || '';
       }
 
       return {

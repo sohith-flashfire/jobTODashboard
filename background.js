@@ -19,19 +19,25 @@ const CONTENT_SCRIPTS = [
 ];
 
 chrome.action.onClicked.addListener((tab) => {
-  chrome.tabs.sendMessage(tab.id, { action: 'togglePanel' }, (response) => {
-    if (chrome.runtime.lastError) {
-      // Content script not available, inject all files in order
-      chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        files: CONTENT_SCRIPTS
-      }).then(() => {
-        setTimeout(() => {
-          chrome.tabs.sendMessage(tab.id, { action: 'togglePanel' });
-        }, 150);
-      }).catch((error) => {
-        console.error('Failed to inject content scripts:', error);
-      });
-    }
-  });
+  const tabId = tab.id;
+  const openPanelAfterRefresh = () => {
+    chrome.tabs.sendMessage(tabId, { action: 'togglePanel' }, (err) => {
+      if (chrome.runtime.lastError) {
+        chrome.scripting.executeScript({
+          target: { tabId },
+          files: CONTENT_SCRIPTS
+        }).then(() => {
+          setTimeout(() => chrome.tabs.sendMessage(tabId, { action: 'togglePanel' }), 300);
+        }).catch((e) => console.error('Failed to inject:', e));
+      }
+    });
+  };
+
+  const onUpdated = (updatedTabId, changeInfo) => {
+    if (updatedTabId !== tabId || changeInfo.status !== 'complete') return;
+    chrome.tabs.onUpdated.removeListener(onUpdated);
+    setTimeout(openPanelAfterRefresh, 200);
+  };
+  chrome.tabs.onUpdated.addListener(onUpdated);
+  chrome.tabs.reload(tabId);
 });
