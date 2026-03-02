@@ -131,6 +131,7 @@ document.addEventListener('DOMContentLoaded', function () {
   const companyNameInput = document.getElementById('company-name');
   const jobTitleInput = document.getElementById('job-title');
   const jobDescriptionInput = document.getElementById('job-description');
+  const jobUrlInput = document.getElementById('job-url');
 
   let allUsers = [];
   let selectedUsers = [];
@@ -777,8 +778,17 @@ document.addEventListener('DOMContentLoaded', function () {
             companyNameInput.value = jobData.company || '';
             jobTitleInput.value = jobData.position || '';
             jobDescriptionInput.value = jobData.description || '';
-            lastExtractionSourceUrl = jobData.url || null;
+            const url = jobData.url || null;
+            lastExtractionSourceUrl = url;
             lastExtractionConfidence = confidence;
+            if (jobUrlInput) jobUrlInput.value = url || '';
+            if (!url && jobUrlInput) {
+              getMyTabUrl(function (tabUrl) {
+                if (tabUrl && tabUrl !== 'Unknown URL') {
+                  jobUrlInput.value = tabUrl;
+                }
+              });
+            }
 
             // If confidence is high enough, skip auto-extract (saves API call)
             if (confidence >= 80) {
@@ -787,6 +797,12 @@ document.addEventListener('DOMContentLoaded', function () {
             }
           } else {
             console.log('No job data received from content script');
+            // Still try to get URL from tab when no job data
+            getMyTabUrl(function (tabUrl) {
+              if (jobUrlInput && tabUrl && tabUrl !== 'Unknown URL') {
+                jobUrlInput.value = tabUrl;
+              }
+            });
           }
         });
       });
@@ -807,6 +823,7 @@ document.addEventListener('DOMContentLoaded', function () {
     companyNameInput.value = '';
     jobTitleInput.value = '';
     jobDescriptionInput.value = '';
+    if (jobUrlInput) jobUrlInput.value = '';
     // Reset Save Job button text
     const saveJobBtn = document.getElementById('save-job');
     if (saveJobBtn) {
@@ -870,9 +887,9 @@ document.addEventListener('DOMContentLoaded', function () {
       extensionCode: extensionCodeToSend
     };
 
-    // Use URL from extraction/auto-fill if available (avoids mismatch when user switches tabs).
-    // Fallback: use the stored panelTabId to get the correct tab's URL instead of querying active tab.
-    let urlToUse = lastExtractionSourceUrl;
+    // Use URL from form (user can verify/edit), then extraction, then tab lookup.
+    let urlToUse = (jobUrlInput && jobUrlInput.value) ? jobUrlInput.value.trim() : null;
+    if (!urlToUse) urlToUse = lastExtractionSourceUrl;
     if (!urlToUse) {
       try {
         urlToUse = await new Promise((resolve) => {
@@ -965,7 +982,8 @@ document.addEventListener('DOMContentLoaded', function () {
       return {
         company: data.data.company || 'Unknown',
         position: data.data.position || 'Unknown',
-        description: data.data.description || ''
+        description: data.data.description || '',
+        url: data.data.url || ''
       };
     } catch (error) {
       console.error('Job extraction error:', error);
@@ -1063,17 +1081,25 @@ document.addEventListener('DOMContentLoaded', function () {
                   if (response && response.ok) {
                     const { content, websiteUrl } = response.payload;
 
-                    try {
-                      extractedData = await extractJobDataWithOpenAI(content, websiteUrl);
-                      lastExtractionSourceUrl = websiteUrl || null;
-                      console.log('Using AI-extracted job data:', extractedData);
-                      processExtractedData(extractedData, selectedEmails);
-                    } catch (extractionError) {
-                      console.error('Extraction error:', extractionError);
-                      alert('Failed to extract job data: ' + extractionError.message);
-                      extractBtn.disabled = false;
-                      extractBtn.classList.remove('loading');
+                    async function tryAIExtraction(retriesLeft) {
+                      try {
+                        const data = await extractJobDataWithOpenAI(content, websiteUrl);
+                        lastExtractionSourceUrl = websiteUrl || null;
+                        console.log('Using AI-extracted job data:', data);
+                        processExtractedData(data, selectedEmails);
+                      } catch (extractionError) {
+                        console.error('Extraction error:', extractionError);
+                        if (retriesLeft > 0) {
+                          console.log('Retrying AI extraction...');
+                          setTimeout(() => tryAIExtraction(retriesLeft - 1), 1500);
+                        } else {
+                          alert('Failed to extract job data. Please try again or fill in manually.\n\n' + extractionError.message);
+                          extractBtn.disabled = false;
+                          extractBtn.classList.remove('loading');
+                        }
+                      }
                     }
+                    tryAIExtraction(1);
                   } else {
                     const errorMsg = response && response.error ? response.error : 'Unknown error';
                     alert('Failed to extract page content: ' + errorMsg);
@@ -1097,6 +1123,7 @@ document.addEventListener('DOMContentLoaded', function () {
             companyNameInput.value = extractedData.company || '';
             jobTitleInput.value = extractedData.position || '';
             jobDescriptionInput.value = extractedData.description || '';
+            if (jobUrlInput && extractedData.url) jobUrlInput.value = extractedData.url;
             
             // Show the modal so user can review and edit
             showJobModal();

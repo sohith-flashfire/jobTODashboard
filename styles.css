@@ -762,6 +762,13 @@ body {
   font-family: inherit;
 }
 
+.job-url-hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  color: #6b7280;
+}
+
 .modal-footer {
   display: flex;
   justify-content: space-between;
