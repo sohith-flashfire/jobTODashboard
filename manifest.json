@@ -1,12 +1,13 @@
 {
   "manifest_version": 3,
   "name": "FlashFire Job Extractor",
-  "version": "2.0",
+  "version": "2.0.4",
   "description": "Extract job data from any job board with smart multi-layer extraction",
   "permissions": [
     "activeTab",
     "tabs",
-    "scripting"
+    "scripting",
+    "webNavigation"
   ],
   "host_permissions": [
     "http://localhost:8086/*",
@@ -27,6 +28,8 @@
       "matches": [
         "<all_urls>"
       ],
+      "all_frames": true,
+      "match_about_blank": true,
       "js": [
         "extractors/namespace.js",
         "extractors/confidence.js",
@@ -41,6 +44,7 @@
         "extractors/site-smartrecruiters.js",
         "extractors/site-icims.js",
         "extractors/site-bamboohr.js",
+        "extractors/site-ashby.js",
         "extractors/generic.js",
         "extractors/pipeline.js",
         "content.js"
