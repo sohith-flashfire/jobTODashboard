@@ -177,28 +177,49 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
   (function captureTabId() {
-    if (chrome && chrome.tabs && chrome.tabs.query) {
-      chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-        if (tabs && tabs[0] && panelTabId == null) {
-          panelTabId = tabs[0].id;
-        }
-      });
-    }
+    try {
+      if (chrome && chrome.tabs && chrome.tabs.query) {
+        chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+          if (tabs && tabs[0] && panelTabId == null) {
+            panelTabId = tabs[0].id;
+          }
+        });
+      }
+    } catch (e) { /* extension context invalidated */ }
   })();
+
+  // Check if extension context is still valid
+  function isExtensionContextValid() {
+    try {
+      chrome.runtime.getURL('');
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
 
   // Helper: get this panel's tab ID reliably. Uses cached ID if available,
   // falls back to querying (and caching) the active tab.
   function getMyTabId(callback) {
+    if (!isExtensionContextValid()) {
+      stopPageLoadPolling();
+      callback(undefined);
+      return;
+    }
     if (panelTabId) {
       callback(panelTabId);
       return;
     }
     if (chrome && chrome.tabs && chrome.tabs.query) {
-      chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-        const tabId = tabs && tabs[0] ? tabs[0].id : undefined;
-        if (tabId) panelTabId = tabId;
-        callback(tabId);
-      });
+      try {
+        chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+          const tabId = tabs && tabs[0] ? tabs[0].id : undefined;
+          if (tabId) panelTabId = tabId;
+          callback(tabId);
+        });
+      } catch (e) {
+        callback(undefined);
+      }
     } else {
       callback(undefined);
     }
@@ -206,70 +227,83 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // Helper: get this panel's tab URL reliably.
   function getMyTabUrl(callback) {
-    if (panelTabId && chrome && chrome.tabs && chrome.tabs.get) {
-      chrome.tabs.get(panelTabId, function (tab) {
-        if (chrome.runtime.lastError || !tab) {
-          callback('Unknown URL');
-        } else {
-          callback(tab.url || 'Unknown URL');
-        }
-      });
-    } else {
-      getMyTabId(function (tabId) {
-        if (tabId && chrome && chrome.tabs && chrome.tabs.get) {
-          chrome.tabs.get(tabId, function (tab) {
-            if (chrome.runtime.lastError || !tab) {
+    if (!isExtensionContextValid()) { callback('Unknown URL'); return; }
+    try {
+      if (panelTabId && chrome && chrome.tabs && chrome.tabs.get) {
+        chrome.tabs.get(panelTabId, function (tab) {
+          if (chrome.runtime.lastError || !tab) {
+            callback('Unknown URL');
+          } else {
+            callback(tab.url || 'Unknown URL');
+          }
+        });
+      } else {
+        getMyTabId(function (tabId) {
+          if (tabId && chrome && chrome.tabs && chrome.tabs.get) {
+            try {
+              chrome.tabs.get(tabId, function (tab) {
+                if (chrome.runtime.lastError || !tab) {
+                  callback('Unknown URL');
+                } else {
+                  callback(tab.url || 'Unknown URL');
+                }
+              });
+            } catch (e) {
               callback('Unknown URL');
-            } else {
-              callback(tab.url || 'Unknown URL');
             }
-          });
-        } else {
-          callback('Unknown URL');
-        }
-      });
+          } else {
+            callback('Unknown URL');
+          }
+        });
+      }
+    } catch (e) {
+      callback('Unknown URL');
     }
   }
 
   /** Tab load + document readyState (content script). Used for gating save and fresh job URL. */
   function getPageLoadStatusForMyTab(callback) {
+    if (!isExtensionContextValid()) {
+      stopPageLoadPolling();
+      callback({ ok: false, chromeTabUrl: '', tabStatus: '', readyState: '' });
+      return;
+    }
     getMyTabId(function (tabId) {
       if (!tabId || !chrome.tabs || !chrome.tabs.get) {
-        callback({
-          ok: false,
-          chromeTabUrl: '',
-          tabStatus: '',
-          readyState: '',
-        });
+        callback({ ok: false, chromeTabUrl: '', tabStatus: '', readyState: '' });
         return;
       }
-      chrome.tabs.get(tabId, function (tab) {
-        if (chrome.runtime.lastError || !tab) {
-          callback({
-            ok: false,
-            chromeTabUrl: '',
-            tabStatus: '',
-            readyState: '',
-          });
-          return;
-        }
-        const tabComplete = tab.status === 'complete';
-        const chromeTabUrl = tab.url || '';
-        chrome.tabs.sendMessage(tabId, { action: 'getPageLoadStatus' }, function (resp) {
-          const err = chrome.runtime.lastError;
-          let docReady = true;
-          if (!err && resp && resp.readyState === 'loading') {
-            docReady = false;
+      try {
+        chrome.tabs.get(tabId, function (tab) {
+          if (chrome.runtime.lastError || !tab) {
+            callback({ ok: false, chromeTabUrl: '', tabStatus: '', readyState: '' });
+            return;
           }
-          const ok = tabComplete && docReady;
-          callback({
-            ok,
-            chromeTabUrl,
-            tabStatus: tab.status,
-            readyState: err || !resp ? 'unknown' : resp.readyState,
-          });
+          const tabComplete = tab.status === 'complete';
+          const chromeTabUrl = tab.url || '';
+          try {
+            chrome.tabs.sendMessage(tabId, { action: 'getPageLoadStatus' }, function (resp) {
+              const err = chrome.runtime.lastError;
+              let docReady = true;
+              if (!err && resp && resp.readyState === 'loading') {
+                docReady = false;
+              }
+              const ok = tabComplete && docReady;
+              callback({
+                ok,
+                chromeTabUrl,
+                tabStatus: tab.status,
+                readyState: err || !resp ? 'unknown' : resp.readyState,
+              });
+            });
+          } catch (e) {
+            callback({ ok: false, chromeTabUrl, tabStatus: tab.status, readyState: 'error' });
+          }
         });
-      });
+      } catch (e) {
+        stopPageLoadPolling();
+        callback({ ok: false, chromeTabUrl: '', tabStatus: '', readyState: '' });
+      }
     });
   }
 
@@ -1252,80 +1286,112 @@ document.addEventListener('DOMContentLoaded', function () {
           }
 
           function tryExtraction() {
+            if (!isExtensionContextValid()) {
+              alert('Extension was updated. Please refresh this page and try again.');
+              extractBtn.disabled = false;
+              extractBtn.classList.remove('loading');
+              return;
+            }
             // First, try to get structured job data (more reliable)
-            chrome.tabs.sendMessage(tabId, { action: 'getJobData' }, async function (structuredResponse) {
-              if (chrome.runtime.lastError) {
-                chrome.scripting.executeScript({
-                  target: { tabId: tabId },
-                  files: ['content.js']
-                }).then(() => {
-                  setTimeout(tryExtraction, 1000);
-                }).catch((error) => {
-                  alert('Failed to inject content script. Please refresh the page and try again.');
-                  extractBtn.disabled = false;
-                  extractBtn.classList.remove('loading');
-                });
-                return;
-              }
-
-              let extractedData = null;
-              var confidence = (structuredResponse && structuredResponse.confidence) || 0;
-
-              // If we got structured data with sufficient confidence, use it directly (skip AI)
-              if (structuredResponse && structuredResponse.jobData && confidence >= 50 &&
-                  structuredResponse.jobData.company !== 'Unknown Company' &&
-                  structuredResponse.jobData.position !== 'Unknown Position') {
-                extractedData = {
-                  company: structuredResponse.jobData.company,
-                  position: structuredResponse.jobData.position,
-                  description: structuredResponse.jobData.description || ''
-                };
-                lastExtractionSourceUrl = structuredResponse.jobData.url || null;
-                lastExtractionConfidence = confidence;
-                console.log('Using structured job data (confidence: ' + confidence + '):', extractedData);
-                processExtractedData(extractedData, selectedEmails);
-              } else {
-                // Fallback to AI extraction (confidence < 50 or missing key fields)
-                console.log('Confidence too low (' + confidence + '), falling back to AI extraction');
-                chrome.tabs.sendMessage(tabId, { action: 'extractPageHtml' }, async function (response) {
-                  if (chrome.runtime.lastError) {
-                    alert('Failed to communicate with content script. Please refresh the page and try again.');
+            try {
+              chrome.tabs.sendMessage(tabId, { action: 'getJobData' }, async function (structuredResponse) {
+                if (chrome.runtime.lastError) {
+                  try {
+                    chrome.scripting.executeScript({
+                      target: { tabId: tabId },
+                      files: ['content.js']
+                    }).then(() => {
+                      setTimeout(tryExtraction, 1000);
+                    }).catch(() => {
+                      alert('Failed to inject content script. Please refresh the page and try again.');
+                      extractBtn.disabled = false;
+                      extractBtn.classList.remove('loading');
+                    });
+                  } catch (e) {
+                    alert('Extension context lost. Please refresh the page and try again.');
                     extractBtn.disabled = false;
                     extractBtn.classList.remove('loading');
-                    return;
                   }
+                  return;
+                }
 
-                  if (response && response.ok) {
-                    const { content, websiteUrl } = response.payload;
+                let extractedData = null;
+                var confidence = (structuredResponse && structuredResponse.confidence) || 0;
 
-                    async function tryAIExtraction(retriesLeft) {
-                      try {
-                        const data = await extractJobDataWithOpenAI(content, websiteUrl);
-                        lastExtractionSourceUrl = websiteUrl || null;
-                        console.log('Using AI-extracted job data:', data);
-                        processExtractedData(data, selectedEmails);
-                      } catch (extractionError) {
-                        console.error('Extraction error:', extractionError);
-                        if (retriesLeft > 0) {
-                          console.log('Retrying AI extraction...');
-                          setTimeout(() => tryAIExtraction(retriesLeft - 1), 1500);
-                        } else {
-                          alert('Failed to extract job data. Please try again or fill in manually.\n\n' + extractionError.message);
+                // If we got structured data with sufficient confidence, use it directly (skip AI)
+                if (structuredResponse && structuredResponse.jobData && confidence >= 50 &&
+                    structuredResponse.jobData.company !== 'Unknown Company' &&
+                    structuredResponse.jobData.position !== 'Unknown Position') {
+                  extractedData = {
+                    company: structuredResponse.jobData.company,
+                    position: structuredResponse.jobData.position,
+                    description: structuredResponse.jobData.description || ''
+                  };
+                  lastExtractionSourceUrl = structuredResponse.jobData.url || null;
+                  lastExtractionConfidence = confidence;
+                  console.log('Using structured job data (confidence: ' + confidence + '):', extractedData);
+                  processExtractedData(extractedData, selectedEmails);
+                } else {
+                  // Fallback to AI extraction (confidence < 50 or missing key fields)
+                  console.log('Confidence too low (' + confidence + '), falling back to AI extraction');
+                  try {
+                    chrome.tabs.sendMessage(tabId, { action: 'extractPageHtml' }, async function (response) {
+                      if (chrome.runtime.lastError) {
+                        alert('Failed to communicate with content script. Please refresh the page and try again.');
+                        extractBtn.disabled = false;
+                        extractBtn.classList.remove('loading');
+                        return;
+                      }
+
+                      if (response && response.ok) {
+                        const { content, websiteUrl } = response.payload;
+
+                        // Guard: don't send empty content to the API
+                        if (!content || typeof content !== 'string' || content.trim().length < 20) {
+                          alert('Could not extract page content. The page may still be loading — please wait a moment and try again.');
                           extractBtn.disabled = false;
                           extractBtn.classList.remove('loading');
+                          return;
                         }
+
+                        async function tryAIExtraction(retriesLeft) {
+                          try {
+                            const data = await extractJobDataWithOpenAI(content, websiteUrl);
+                            lastExtractionSourceUrl = websiteUrl || null;
+                            console.log('Using AI-extracted job data:', data);
+                            processExtractedData(data, selectedEmails);
+                          } catch (extractionError) {
+                            console.error('Extraction error:', extractionError);
+                            if (retriesLeft > 0) {
+                              console.log('Retrying AI extraction...');
+                              setTimeout(() => tryAIExtraction(retriesLeft - 1), 1500);
+                            } else {
+                              alert('Failed to extract job data. Please try again or fill in manually.\n\n' + extractionError.message);
+                              extractBtn.disabled = false;
+                              extractBtn.classList.remove('loading');
+                            }
+                          }
+                        }
+                        tryAIExtraction(1);
+                      } else {
+                        const errorMsg = response && response.error ? response.error : 'Unknown error';
+                        alert('Failed to extract page content: ' + errorMsg);
+                        extractBtn.disabled = false;
+                        extractBtn.classList.remove('loading');
                       }
-                    }
-                    tryAIExtraction(1);
-                  } else {
-                    const errorMsg = response && response.error ? response.error : 'Unknown error';
-                    alert('Failed to extract page content: ' + errorMsg);
+                    });
+                  } catch (e) {
+                    alert('Extension context lost. Please refresh the page.');
                     extractBtn.disabled = false;
                     extractBtn.classList.remove('loading');
                   }
-                });
-              }
-            });
+                }
+              });
+            } catch (e) {
+              alert('Extension context lost. Please refresh this page and try again.');
+              extractBtn.disabled = false;
+              extractBtn.classList.remove('loading');
+            }
           }
 
           function processExtractedData(extractedData, selectedEmails) {
